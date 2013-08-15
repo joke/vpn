@@ -1,0 +1,34 @@
+#ifdef IN_IDE_PARSER
+#include "signal.h++"
+#endif
+
+namespace {
+
+inline signal::signal(boost::asio::io_service& io) : io_(io), set_(io_) {
+	using namespace boost::asio;
+	using namespace std;
+	using namespace placeholders;
+
+	// register signals
+	set_.add(SIGTERM);
+	set_.add(SIGINT);
+	set_.add(SIGHUP);
+	set_.async_wait(bind(&signal::handler, this, _1, _2));
+}
+
+inline void signal::handler(const boost::system::error_code& e, int const signal) {
+	using namespace std;
+	using namespace placeholders;
+
+	// stop a any signal for now. later more
+
+	if (!e) {
+		if (signal == SIGINT)
+			io_.stop();
+		else if (signal == SIGTERM)
+			io_.stop();
+	} else
+		set_.async_wait(bind(&signal::handler, this, _1, _2));
+}
+
+} // namespace: <>

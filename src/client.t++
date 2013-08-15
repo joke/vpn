@@ -1,0 +1,90 @@
+#ifdef IN_IDE_PARSER
+#include "client.h++"
+#endif
+
+namespace {
+
+template <typename Protocol>
+client<Protocol>::client(boost::asio::io_service& s, typename Protocol::endpoint const& e) : stream_(e) {
+}
+
+template <typename Protocol>
+inline bool client<Protocol>::node_list() {
+	using namespace std;
+	using namespace boost::asio;
+
+	// create query and print result
+	query query;
+	query.action_ = query::action::nodelist;
+	submit(query);
+	for (auto& e : query.endpoints_)
+		std::cout << e << std::endl;
+}
+
+template <typename Protocol>
+inline bool client<Protocol>::node_add(std::string const& node) {
+	using namespace boost::asio::ip;
+	using namespace std;
+
+	// prepare query
+	query query;
+	query.action_ = query::action::nodeadd;
+
+	// parse command line string and resolve domain
+	boost::asio::io_service io;
+	udp::resolver r(io);
+	stringstream s(node);
+	string host;
+	string service;
+	s >> host >> service;
+
+	// resolve and queue endpoints
+	auto endpoint_it(r.resolve(udp::resolver::query(udp::v6(), host, service, udp::resolver::query::flags::v4_mapped)));
+	for (; endpoint_it != decltype(endpoint_it)(); ++endpoint_it)
+		query.endpoints_.emplace_back(endpoint_it->endpoint());
+
+	submit(query);
+}
+
+template <typename Protocol>
+inline bool client<Protocol>::node_del(std::string const& node) {
+	using namespace boost::asio::ip;
+	using namespace std;
+
+	// convert command line string
+	stringstream s(node);
+	string host;
+	int port;
+	s >> host >> port;
+
+	// create query and send everything
+	query query;
+	query.action_ = query::action::nodedel;
+	query.endpoints_.emplace_back(udp::endpoint(address::from_string(host), port));
+
+	submit(query);
+}
+
+template <typename Protocol>
+inline void client<Protocol>::submit(query& query) {
+	using namespace std;
+
+	{
+		// create a serialization stream
+		stringstream request;
+		boost::archive::text_oarchive oa(request);
+		oa << query;
+
+		// the server needs to know how may bytes he needs to read. send the size first
+		stream_ << hex << setw(sizeof(size_t) * 2) << request.str().size() << flush << dec << setw(0) << request.rdbuf() << std::endl;
+	}
+	{
+		// the client can just the the stream
+		boost::archive::text_iarchive ia(stream_);
+		ia >> query;
+	}
+}
+
+
+} // namespace: <>
+

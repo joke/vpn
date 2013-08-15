@@ -1,0 +1,13 @@
+#ifdef IN_IDE_PARSER
+#include "controller_protocol.h++"
+#endif
+
+namespace {
+
+template<class Archive>
+inline void query::serialize(Archive& a, unsigned int const) {
+	a & action_;
+	a & endpoints_;
+}
+
+} // namespace: <>

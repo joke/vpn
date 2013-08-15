@@ -1,0 +1,256 @@
+#ifdef IN_IDE_PARSER
+#include "netdevice.h++"
+#endif
+
+#include "convert.h++"
+#include "program_options.h++"
+#include <boost/asio/ip/udp.hpp>
+#include <boost/asio/posix/stream_descriptor.hpp>
+#include <algorithm>
+#include <cstdlib>
+#include <string>
+#include <cerrno>
+#include <functional>
+#include <system_error>
+#include <linux/if_tun.h>
+#include <linux/ipv6_route.h>
+#include <iomanip>
+#include <thread>
+
+
+namespace {
+
+template <typename Server>
+inline netdevice<Server>::netdevice(boost::asio::io_service& io, gateway_type& g) :
+	io_(io),
+	gateway_(g),
+	name_(cfg::configuration["device"].as<std::string>()),
+	stream_descriptor_(io_)
+{
+	using namespace std;
+
+	// open device
+	auto fd(::open("/dev/net/tun", O_RDWR));
+	if (fd < 0)
+		throw system_error(errno, system_category(), "Could not open tun/tap control device");
+	stream_descriptor_.assign(fd);
+
+	// do some io control
+	ifreq req({});
+	req.ifr_ifru.ifru_flags = IFF_TUN | IFF_NO_PI;
+	name_.copy(req.ifr_name, IFNAMSIZ);
+	ioctl set(TUNSETIFF, &req);
+	stream_descriptor_.io_control(set);
+	name_ = req.ifr_name;
+	// needs to be reassigned after this specific ioctl
+	stream_descriptor_.release();
+	stream_descriptor_.assign(fd);
+
+	// calculate address from fingerprint
+	stringstream add;
+	auto finger(to_hex(gateway_.fingerprint().data(), gateway_.fingerprint().size()));
+	add << "fc" << finger[10] << finger[11] << ":"
+		<< finger[12] << finger[13] << finger[14] << finger[15] << ":"
+		<< finger[16] << finger[17] << finger[18] << finger[19] << ":"
+		<< finger[20] << finger[21] << finger[22] << finger[23] << ":"
+		<< finger[24] << finger[25] << finger[26] << finger[27] << ":"
+		<< finger[28] << finger[29] << finger[30] << finger[31] << ":"
+		<< finger[32] << finger[33] << finger[34] << finger[35] << ":"
+		<< finger[36] << finger[37] << finger[38] << finger[39];
+
+	// route up and go
+	address(boost::asio::ip::address_v6::from_string(add.str()));
+	route(boost::asio::ip::address_v6::from_string("fc::"), 64);
+	up();
+	mtu(1280);
+}
+
+template <typename Server>
+inline void netdevice<Server>::run() {
+	using namespace std;
+
+	auto buffer(make_shared<vector<uint8_t>>(1280));
+	accept(buffer);
+}
+
+template <typename Server>
+inline netdevice<Server>::~netdevice() noexcept {
+	stream_descriptor_.close();
+}
+
+template <typename Server>
+inline void netdevice<Server>::up() {
+	using namespace boost::asio;
+
+	io_service io;
+	ifreq req({});
+	name_.copy(req.ifr_name, IFNAMSIZ);
+	ip::udp::socket socket(io, ip::udp::v4());
+	ioctl get(SIOCGIFFLAGS, &req);
+	socket.io_control(get);
+	req.ifr_flags |= IFF_UP;
+	ioctl set(SIOCSIFFLAGS, &req);
+	socket.io_control(set);
+}
+
+template <typename Server>
+inline bool netdevice<Server>::is_up() const {
+	using namespace boost::asio;
+
+	io_service io;
+	ifreq req({});
+	name_.copy(req.ifr_name, IFNAMSIZ);
+	ip::udp::socket socket(io, ip::udp::v4());
+	ioctl get(SIOCGIFFLAGS, &req);
+	socket.io_control(get);
+	return req.ifr_flags & IFF_UP;
+}
+
+template <typename Server>
+inline void netdevice<Server>::mtu(unsigned int mtu) {
+	using namespace boost::asio;
+
+	io_service io;
+	ifreq req({});
+	name_.copy(req.ifr_name, IFNAMSIZ);
+	ip::udp::socket socket(io, ip::udp::v4());
+	req.ifr_mtu = mtu;
+	ioctl set(SIOCSIFMTU, &req);
+	socket.io_control(set);
+}
+
+template <typename Server>
+inline unsigned int netdevice<Server>::mtu() const {
+	using namespace boost::asio;
+
+	io_service io;
+	ifreq req({});
+	name_.copy(req.ifr_name, IFNAMSIZ);
+	ip::udp::socket socket(io, ip::udp::v4());
+	ioctl get(SIOCGIFMTU, &req);
+	socket.io_control(get);
+	return req.ifr_mtu;
+}
+
+// template <typename Server>
+// inline void netdevice<Server>::address(boost::asio::ip::address const& address) {
+// 	if (address.is_v4())
+// 		address(address.to_v4());
+// 	else
+// 		address(address.to_v6());
+// }
+
+// template <typename Server>
+// inline void netdevice<Server>::address(boost::asio::ip::address_v4 const& address) {
+// 	using namespace boost::asio;
+//
+// 	io_service io;
+// 	ifreq req({});
+// 	name_.copy(req.ifr_name, IFNAMSIZ);
+// 	ip::udp::socket socket(io, ip::udp::v4());
+// 	ip::udp::endpoint end;
+// 	end.address(address);
+// 	std::copy_n(end.data(), 1, &req.ifr_addr);
+// //	std::copy_n(&reinterpret_cast<detail::sockaddr_in4_type*>(end.data())->sin6_addr, 1, &req.ifr_addr);
+// 	ioctl set(SIOCSIFADDR, &req);
+// 	socket.io_control(set);
+// }
+
+template <typename Server>
+inline void netdevice<Server>::address(boost::asio::ip::address_v6 const& address) {
+	using namespace std;
+	using namespace boost::asio;
+
+	// from linux/ipv6.h
+	struct in6_ifreq {
+		struct in6_addr ifr6_addr;
+		__u32           ifr6_prefixlen;
+		int             ifr6_ifindex;
+	};
+
+	io_service io;
+ 	in6_ifreq if6req({});
+	if6req.ifr6_prefixlen = 128;
+	if6req.ifr6_ifindex = ifindex();
+	ip::udp::endpoint end;
+	end.address(address);
+	std::copy_n(&reinterpret_cast<detail::sockaddr_in6_type*>(end.data())->sin6_addr, 1, &if6req.ifr6_addr);
+	ip::udp::socket socket6(io, ip::udp::v6());
+	ioctl set(SIOCSIFADDR, &if6req);
+	socket6.io_control(set);
+}
+
+template <typename Server>
+inline int netdevice<Server>::ifindex() const {
+	using namespace std;
+	using namespace boost::asio;
+
+	io_service io;
+	ifreq req({});
+	name_.copy(req.ifr_name, IFNAMSIZ);
+	ip::udp::socket socket4(io, ip::udp::v4());
+	ioctl get(SIOCGIFINDEX, &req);
+	socket4.io_control(get);
+	return req.ifr_ifindex;
+}
+
+template <typename Server>
+inline void netdevice<Server>::route(boost::asio::ip::address_v6 const&, std::uint8_t const prefix) {
+	using namespace std;
+
+	system(string(string("ip -6 route add fc00::/8 metric 64 dev ") + name_).data());
+
+	//io_service io;
+	//in6_rtmsg route({});
+}
+
+template <typename Server>
+inline void netdevice<Server>::accept(std::shared_ptr<std::vector<std::uint8_t>> buffer) {
+	using namespace std;
+	using namespace placeholders;
+
+	lock_guard<mutex> lock(stream_descriptor_mutex_);
+	stream_descriptor_.async_read_some(boost::asio::buffer(*buffer), bind(&netdevice<Server>::read, this, buffer, _1, _2));
+}
+
+
+template <typename Server>
+inline void netdevice<Server>::send(boost::asio::const_buffers_1 b) {
+	std::lock_guard<std::mutex> lock(stream_descriptor_mutex_);
+
+	boost::asio::write(stream_descriptor_, b);
+}
+
+template <typename Server>
+inline void netdevice<Server>::read(std::shared_ptr<std::vector<std::uint8_t>> buffer, boost::system::error_code const& error, std::size_t bytes_transferred) {
+	using namespace std;
+
+	// TODO: check for errors
+	if (error)
+		return;
+
+	gateway_.forward(boost::asio::buffer(const_cast<const uint8_t*>(buffer->data()), bytes_transferred));
+	accept(buffer);
+}
+
+template <typename Server>
+inline std::string const& netdevice<Server>::name() noexcept {
+	return name_;
+}
+
+template <typename Server>
+inline netdevice<Server>::ioctl::ioctl(int const name, void *data) : name_(name), data_(data) {
+}
+
+template <typename Server>
+inline int netdevice<Server>::ioctl::name() const {
+	return name_;
+}
+
+template <typename Server>
+inline void* netdevice<Server>::ioctl::data() {
+	return data_;
+}
+
+} // namespace: <>
+

@@ -1,0 +1,26 @@
+This is a CMake project to build it run
+
+  $ mkdir build
+  $ cd build
+  $ cmake -DCMAKE_BUILD_TYPE=Release ../
+	$ make all
+	$ make install		 (optional)
+
+the project needs:
+
+	>= g++ 4.7
+	>= boost 1.53
+	>= gnutls 3.1.10 // not released yet
+	>= gpgme more or less recent version
+	>= idn2 more or less recent version
+	>= gpg installed
+
+boost 1.53 is included
+gnutls 3.1.10 (patched) is included
+
+to use it call
+
+	$ cmake -DCMAKE_BUILD_TYPE=Release -DUSE_INTERNAL_GNUTLS=ON -DUSE_INTERNAL_BOOST=ON ../
+
+build on fedora 19. and possible other recent linux versions.
+

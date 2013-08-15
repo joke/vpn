@@ -1,0 +1,417 @@
+#ifdef IN_IDE_PARSER
+#include "session.h++"
+#endif
+
+#include <gnutls/gnutls.h>
+#include <gnutls/dtls.h>
+#include <boost/concept_check.hpp>
+#include <system_error>
+#include <iomanip>
+#include "convert.h++"
+#include "encryption.h++"
+#include "client.h++"
+
+namespace {
+
+template <typename Gateway>
+inline session<Gateway>::session(boost::asio::io_service& io, Gateway& g, endpoint_type const& e, std::set<endpoint_type> const& es, bool server) :
+	io_(io),
+	gateway_(g),
+	timer_(io),
+	session_(nullptr),
+	session_mutex_(),
+	endpoint_(e),
+	endpoints_(es),
+	endpoint_handle_(),
+	prefix_handle_(),
+	receive_src_(nullptr, 0),
+	endpoint_iterator_(),
+	prefix_iterator_(),
+	server_(server),
+	verified_(false),
+	terminate_(false),
+	handshake_completed_(false),
+	bytes_available_(0),
+	pings_missed_(0)
+{
+	using namespace std;
+
+	// lot of gnutls session setup to do
+	auto& credentials(gateway_.credentials());
+	::gnutls_init(&session_, GNUTLS_DATAGRAM | GNUTLS_NONBLOCK | ((server) ? GNUTLS_SERVER : GNUTLS_CLIENT));
+	::gnutls_credentials_set(session_, GNUTLS_CRD_CERTIFICATE, gnutls_certificate_credentials_t(credentials));
+	::gnutls_certificate_server_set_request(session_, GNUTLS_CERT_REQUIRE);
+	::gnutls_openpgp_send_cert(session_, GNUTLS_OPENPGP_CERT);
+	::gnutls_session_set_ptr(session_, this);
+	::gnutls_transport_set_ptr(session_, this);
+	::gnutls_priority_set(session_, credentials);
+	::gnutls_heartbeat_enable(session_, GNUTLS_HB_PEER_ALLOWED_TO_SEND);
+	::gnutls_transport_set_pull_function(session_, session::pull);
+	::gnutls_transport_set_push_function(session_, session::push);
+	::gnutls_transport_set_pull_timeout_function(session_, session::timeout);
+// 	::gnutls_handshake_set_timeout(session_, 10000);
+	::gnutls_dtls_set_timeouts(session_, 500, 10000);
+
+	gateway_.connect(endpoint_, *this);
+}
+
+template <typename Gateway>
+inline session<Gateway>::session(boost::asio::io_service& io, Gateway& g, endpoint_type const& e) : session(io, g, e, std::set<endpoint_type>(), true) {
+}
+
+template <typename Gateway>
+inline session<Gateway>::session(boost::asio::io_service& io, Gateway& g, std::set<endpoint_type> const& e) : session(io, g, *std::begin(e), e, false) {
+	endpoints_.erase(std::begin(endpoints_));
+
+	// create session and start handshake (client mode)
+	std::lock_guard<std::mutex> lock(session_mutex_);
+	std::error_code ec;
+	gnutls::wrap_error(::gnutls_handshake(session_), ec);
+	set_handshake_timer();
+}
+
+template <typename Gateway>
+inline session<Gateway>::operator gnutls_session_t() {
+	return session_;
+}
+
+template <typename Gateway>
+inline std::ptrdiff_t session<Gateway>::pull(gnutls_transport_ptr_t p, void* buffer, std::size_t s) {
+	// gnutls pull functor in async mode
+	auto& se(*static_cast<session*>(p));
+
+	if (!se.bytes_available_) {
+		gnutls_transport_set_errno(se, EAGAIN);
+		return -1;
+	}
+	se.bytes_available_ = 0;
+	return boost::asio::buffer_copy(boost::asio::buffer(buffer, s), se.receive_src_);
+}
+
+template <typename Gateway>
+inline std::ptrdiff_t session<Gateway>::push(gnutls_transport_ptr_t p, const void* buffer, std::size_t s) {
+	// gntuls push functor in async mode
+	auto& se(*static_cast<session*>(p));
+
+	boost::system::error_code ec;
+	return se.gateway_.send(boost::asio::buffer(buffer, s), se.endpoint_, ec);
+}
+
+template <typename Gateway>
+inline void session<Gateway>::set(endpoint_handle_type const& h) {
+	endpoint_handle_ = h;
+}
+
+template <typename Gateway>
+inline void session<Gateway>::set(prefix_handle_type const& h) {
+	prefix_handle_ = h;
+}
+
+template <typename Gateway>
+inline void session<Gateway>::next_endpoint() {
+	if (std::begin(endpoints_) != std::end(endpoints_))
+		new session(io_, gateway_, std::move(endpoints_));
+	terminate();
+}
+
+template <typename Gateway>
+inline void session<Gateway>::endpoint(endpoint_iterator_type it) {
+	endpoint_iterator_ = it;
+}
+
+template <typename Gateway>
+inline typename session<Gateway>::endpoint_iterator_type session<Gateway>::endpoint() const {
+	return endpoint_iterator_;
+}
+
+template <typename Gateway>
+inline void session<Gateway>::prefix(prefix_iterator_type it) {
+	prefix_iterator_ = it;
+}
+
+template <typename Gateway>
+inline typename session<Gateway>::prefix_iterator_type session<Gateway>::prefix() const {
+	return prefix_iterator_;
+}
+
+template <typename Gateway>
+inline void session<Gateway>::set_handshake_timer() {
+	using namespace std;
+
+	// set handshake timer
+	if (::gnutls_record_get_direction(session_)) {
+		timer_.expires_from_now(chrono::milliseconds(::gnutls_dtls_get_timeout(session_)));
+		timer_.async_wait(bind(&session::handshake_timer_expired, this, placeholders::_1));
+	}
+}
+
+template <typename Gateway>
+void session<Gateway>::handshake_timer_expired(boost::system::error_code const& e) {
+	using namespace std;
+
+	if (e)
+		return;
+
+	timer_.expires_from_now(chrono::seconds(10));
+	timer_.async_wait(bind(&session::terminate, this, placeholders::_1));
+	lock_guard<mutex> lock(session_mutex_);
+	handshake();
+}
+
+template <typename Gateway>
+inline int session<Gateway>::timeout(gnutls_transport_ptr_t s, unsigned int t) {
+	auto& se(*static_cast<session*>(s));
+
+	return (se.bytes_available_) ? se.bytes_available_ : 0;
+}
+
+template <typename Gateway>
+inline session<Gateway>::~session() {
+	if (!terminate_)
+		bye();
+	gateway_.disconnect(endpoint_handle_);
+	if (verified_)
+		gateway_.disconnect(prefix_handle_);
+	if (session_)
+		::gnutls_deinit(session_);
+}
+
+// start handshake
+template <typename Gateway>
+inline void session<Gateway>::handshake() {
+	// do handshake and check return values
+	std::error_code e;
+	gnutls::wrap_error(::gnutls_handshake(session_), e);
+	switch (e.value()) {
+		case GNUTLS_E_AGAIN:
+			set_handshake_timer();
+			break;
+		case GNUTLS_E_TIMEDOUT:
+			next_endpoint();
+			break;
+		case GNUTLS_E_SUCCESS:
+			// if handshake complete no more handshakes
+			handshake_completed_ = true;
+			::gnutls_dtls_set_data_mtu(session_, 1280);
+			timer_.cancel();
+			if (server_) {
+				// set ping timer
+				timer_.expires_from_now(std::chrono::seconds(30));
+				timer_.async_wait(std::bind(&session::ping, this, std::placeholders::_1));
+			} else
+				ping();
+			break;
+		default:
+			terminate();
+	}
+}
+
+template <typename Gateway>
+inline void session<Gateway>::bye() {
+	::gnutls_bye(session_, GNUTLS_SHUT_RDWR);
+}
+
+template <typename Gateway>
+inline void session<Gateway>::set(gnutls::cookie& c) {
+	::gnutls_dtls_prestate_set(session_, c);
+	c.reset();
+}
+
+template <typename Gateway>
+inline void session<Gateway>::send(boost::asio::const_buffers_1 b) {
+	std::lock_guard<std::mutex> lock(session_mutex_);
+	::gnutls_record_send(session_, boost::asio::buffer_cast<const void*>(b), boost::asio::buffer_size(b));
+}
+
+template <typename Gateway>
+inline void session<Gateway>::ping(boost::system::error_code const& e = boost::system::error_code()) {
+	if (e)
+		return;
+
+	if (++pings_missed_ > 3) {
+		terminate();
+		return;
+	}
+
+	::gnutls_heartbeat_ping(session_, 256, 0, 0);
+	timer_.expires_from_now(std::chrono::seconds(30));
+	timer_.async_wait(std::bind(&session::ping, this, std::placeholders::_1));
+}
+
+template <typename Gateway>
+void session<Gateway>::alert(bool fatal, gnutls_alert_description_t d) {
+	gnutls_alert_send(session_, (fatal) ? GNUTLS_AL_FATAL : GNUTLS_AL_WARNING, d);
+}
+
+template <typename Gateway>
+inline void session<Gateway>::pong() {
+	auto ret = ::gnutls_heartbeat_pong(session_, 0);
+}
+
+template <typename Gateway>
+inline void session<Gateway>::terminate(boost::system::error_code const& e) {
+	if (e == boost::asio::error::operation_aborted)
+		return;
+
+	terminate_ = true;
+	timer_.cancel();
+	timer_.expires_from_now(std::chrono::seconds(3));
+	timer_.async_wait([this](boost::system::error_code const& e) {
+		if (!e)
+			delete this;
+	});
+}
+
+template <typename Gateway>
+inline void session<Gateway>::receive(boost::asio::const_buffers_1 src, boost::asio::mutable_buffers_1 dst) {
+	using namespace std;
+	using namespace boost::asio;
+
+	lock_guard<mutex> lock(session_mutex_);
+	if (terminate_)
+		return;
+
+	receive_src_ = (src);
+	bytes_available_ = buffer_size(src);
+
+	// check if handshake is needed
+	if (!handshake_completed_)
+		handshake();
+	else {
+		// receive from session (decrypt)
+		std::ptrdiff_t bytes_decrypted(::gnutls_record_recv(session_, buffer_cast<void*>(dst), buffer_size(dst)));
+		if (bytes_decrypted > 0)
+			gateway_.decrypted(buffer(const_cast<const void*>(buffer_cast<void*>(dst)), bytes_decrypted));
+		else
+			// check if something went wrong or a ping got through
+			switch (bytes_decrypted) {
+				case GNUTLS_E_AGAIN:
+					break;
+				case GNUTLS_E_HEARTBEAT_PING_RECEIVED:
+					pong();
+					break;
+				case GNUTLS_E_HEARTBEAT_PONG_RECEIVED:
+					pings_missed_ = 0;
+					break;
+				case GNUTLS_E_FATAL_ALERT_RECEIVED:
+				case GNUTLS_E_WARNING_ALERT_RECEIVED:
+					if (::gnutls_alert_get(session_))
+						terminate();
+				break;
+				case 0: // end of file
+				default:
+					terminate();
+					break;
+			}
+	}
+}
+
+template <typename Gateway>
+inline int session<Gateway>::verify(gnutls_session_t s) {
+	using namespace std;
+
+	auto& se(*static_cast<session*>(::gnutls_session_get_ptr(s)));
+
+	// check certificate type
+	if (::gnutls_certificate_type_get(s) != GNUTLS_CRT_OPENPGP) {
+		se.alert(true, GNUTLS_A_UNSUPPORTED_CERTIFICATE);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	// read certificate
+	unsigned int list(0);
+	gnutls::datum datum(::gnutls_certificate_get_peers(s, &list));
+	if (list > 1) {
+		se.alert(true, GNUTLS_A_BAD_CERTIFICATE);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	// import key sent by client into keyring
+	gpgme::context context;
+	if (!cfg::configuration["import"].empty()) {
+		gnutls_datum_t* datum_p(datum);
+		gpgme::data data(reinterpret_cast<char*>(datum_p->data), datum_p->size);
+		context.import_key(data);
+	}
+
+	// process incoming key
+	gnutls::openpgp::certificate certificate(datum);
+	auto fingerprint(certificate.fingerprint());
+	auto fingerprint_hex(to_hex(fingerprint.data(), fingerprint.size()));
+
+	if (!cfg::configuration["keyserver"].empty()) {
+	// query key data (query keyserver)
+		gpgme::key key;
+		if (context.key(key, fingerprint_hex.data(), true))
+			context.import_key(key);
+	}
+
+	gpgme::key key;
+	if (!context.key(key, fingerprint_hex.data(), false))
+		return GNUTLS_E_CERTIFICATE_ERROR;
+
+
+	// check key state
+	gpgme_key_t cert(key);
+	if (cert->disabled || cert->invalid) {
+		se.alert(true, GNUTLS_A_CERTIFICATE_REVOKED);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+	if (cert->expired) {
+		se.alert(true, GNUTLS_A_CERTIFICATE_EXPIRED);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+	if (cert->revoked) {
+		se.alert(true, GNUTLS_A_CERTIFICATE_REVOKED);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	// get id of subkey
+	gnutls::datum subkey_id;
+	gnutls_certificate_get_peers_subkey_id(s, subkey_id);
+	auto subkey_hex(to_hex(subkey_id.data().data, subkey_id.data().size, true));
+
+	// check subkeys
+	bool subkey_match(false);
+	for (auto subkey(cert->subkeys); subkey; subkey = subkey->next) {
+		if (string(subkey->fpr).compare(24, 16, subkey_hex) == 0) {
+			if (subkey->disabled || subkey->invalid || !subkey->can_authenticate) {
+				se.alert(true, GNUTLS_A_CERTIFICATE_UNKNOWN);
+				return GNUTLS_E_CERTIFICATE_ERROR;
+			}
+			if (subkey->expired) {
+				se.alert(true, GNUTLS_A_CERTIFICATE_EXPIRED);
+				return GNUTLS_E_CERTIFICATE_ERROR;
+			}
+			if (subkey->revoked) {
+				se.alert(true, GNUTLS_A_CERTIFICATE_REVOKED);
+				return GNUTLS_E_CERTIFICATE_ERROR;
+			}
+			subkey_match = true;
+		}
+	}
+	if (!subkey_match) {
+		se.alert(true, GNUTLS_A_CERTIFICATE_REVOKED);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	// check uid validity
+	gpgme_validity_t validity(GPGME_VALIDITY_UNKNOWN);
+	for (auto uid(cert->uids); uid; uid = uid->next)
+		validity = max(validity, uid->validity);
+
+	if (validity < cfg::configuration["validity"].as<uint8_t>()) {
+		se.alert(true, GNUTLS_A_CERTIFICATE_EXPIRED);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	std::uint64_t prefix = *reinterpret_cast<const uint64_t*>(fingerprint.data() + 4);
+	(reinterpret_cast<unsigned char*>(&prefix))[0] = 0xfc;
+
+	se.gateway_.connect(prefix, se);
+	se.verified_ = true;
+
+	return 0;
+}
+
+} // namespace: <>

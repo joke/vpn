@@ -1,0 +1,256 @@
+#ifdef IN_IDE_PARSER
+#include "gateway.h++"
+#endif
+
+#include <boost/asio/buffer.hpp>
+#include <iostream>
+#include <type_traits>
+#include <functional>
+#include <algorithm>
+#include <functional>
+#include <iomanip>
+#include <gpgme.h>
+#include "encryption.h++"
+#include "program_options.h++"
+#include "convert.h++"
+#include <boost/detail/endian.hpp>
+#include <thread>
+#include <memory>
+
+namespace {
+
+template <typename Server>
+gateway<Server>::gateway(boost::asio::io_service& s, netdevice_type& n) :
+		io_(s),
+		socket_(io_),
+		netdevice_(n),
+		credentials_(),
+		cookie_(),
+		fingerprint_(),
+		prefix_(0),
+		sessions_endpoint_(),
+		sessions_prefix_(),
+		link_local_(cfg::configuration["link-local"].as<bool>())
+{
+	using namespace cfg;
+	using namespace std;
+	using namespace boost::asio;
+	using namespace gnutls;
+
+	// set gnutls debug level
+	if (configuration["gnutls-debug-level"].as<int>() > 0) {
+		::gnutls_global_set_log_level(configuration["gnutls-debug-level"].as<int>());
+		::gnutls_global_set_log_function([](int level, const char* c) { cerr << "|<" << level << ">| " << c << flush; });
+	}
+
+	// get secret/public keys from keyring (pipes would be a better choice, maybe later)
+	auto err = system(string(configuration["gpg"].as<string>() + " --batch --quiet --no-tty --yes --output /dev/shm/public --export " + configuration["key"].as<string>()).data());
+	err = system(string(configuration["gpg"].as<string>() + " --batch --quiet --no-tty --yes --output /dev/shm/secret --export-options export-minimal --export-secret-keys " + configuration["key"].as<string>()).data());
+	openpgp::certificate cert(datum("/dev/shm/public"));
+	openpgp::privatekey priv(datum("/dev/shm/secret"));
+	std::remove("/dev/shm/public");
+	std::remove("/dev/shm/secret");
+
+	// set credentials and other callbacks
+	credentials_ = move(gnutls::credentials(cert, priv));
+	credentials_.verify_function(session_type::verify);
+	fingerprint_ = cert.fingerprint();
+	prefix_ = *reinterpret_cast<const uint64_t*>(fingerprint_.data() + 4);
+	(reinterpret_cast<unsigned char*>(&prefix_))[0] = 0xfc;
+
+	// open socket on local endpoint
+	endpoint_type endpoint(ip::address::from_string(cfg::configuration["bind"].as<std::string>()), cfg::configuration["port"].as<std::uint16_t>());
+	socket_.open(endpoint.protocol());
+	socket_.bind(endpoint);
+	socket_.native_non_blocking(true);
+	socket_.set_option(boost::asio::detail::socket_option::integer<IPPROTO_IPV6, IPV6_MTU_DISCOVER>(IPV6_PMTUDISC_DO));
+	socket_.set_option(boost::asio::detail::socket_option::boolean<IPPROTO_IPV6, IPV6_RECVERR>(true));
+}
+
+template <typename Server>
+inline gateway<Server>::~gateway() {
+	using namespace std;
+
+	for (typename sessions_endpoint_type::iterator it = begin(sessions_endpoint_); it != end(sessions_endpoint_);)
+		// don't delete directly. session removes/invalidates this iterator in destructor
+		delete it++->second;
+}
+
+template <typename Server>
+inline void gateway<Server>::run() {
+	using namespace std;
+	using namespace placeholders;
+
+	// create buffer for each thread and register proactor
+	auto endpoint(make_shared<endpoint_type>());
+	auto buffer(make_shared<vector<uint8_t>>(16834));
+
+	lock_guard<mutex> lock(socket_mutex_);
+	socket_.async_receive_from(boost::asio::buffer(*buffer), *endpoint, bind(&gateway::receive, this, buffer, endpoint, _1, _2));
+}
+
+template <typename Server>
+inline gnutls::credentials const& gateway<Server>::credentials() {
+	return credentials_;
+}
+
+template <typename Server>
+void inline gateway<Server>::decrypted(boost::asio::const_buffers_1 b) {
+	netdevice_.send(b);
+}
+
+template <typename Server>
+inline std::size_t gateway<Server>::send(boost::asio::const_buffers_1 b, endpoint_type e, boost::system::error_code& ec) {
+	using namespace std;
+
+	// locak socket!
+	lock_guard<mutex> lock(socket_mutex_);
+	return socket_.send_to(b, e, 0, ec);
+}
+
+template <typename Server>
+inline std::vector<std::uint8_t> const& gateway<Server>::fingerprint() const {
+	return fingerprint_;
+}
+
+template <typename Server>
+inline typename gateway<Server>::prefix_type gateway<Server>::prefix() const {
+	return prefix_;
+}
+
+template <typename Server>
+inline std::list<typename gateway<Server>::endpoint_type> gateway<Server>::peers() {
+	std::list<endpoint_type> peers;
+	for (auto& endpoint : sessions_endpoint_)
+		peers.push_front(std::get<0>(endpoint));
+	return peers;
+}
+
+template <typename Server>
+void gateway<Server>::connect(prefix_type const& p, session_type& s) {
+	// connect a prefix
+	std::lock_guard<std::mutex> lock(sessions_prefix_mutex_);
+	auto pos(sessions_prefix_.insert({p, &s}));
+	if (std::get<1>(pos))
+		s.set(std::get<0>(pos));
+}
+
+template <typename Server>
+void gateway<Server>::connect(endpoint_type const& e, session_type& s) {
+	// connect an endpoint
+	std::lock_guard<std::mutex> lock(sessions_endpoint_mutex_);
+	auto pos(sessions_endpoint_.insert({e, &s}));
+	if (std::get<1>(pos))
+		s.set(std::get<0>(pos));
+}
+
+template <typename Server>
+void gateway<Server>::disconnect(prefix_handle_type const& h) {
+	std::lock_guard<std::mutex> lock(sessions_prefix_mutex_);
+	sessions_prefix_.erase(h);
+}
+
+template <typename Server>
+void gateway<Server>::disconnect(endpoint_handle_type const& h) {
+	std::lock_guard<std::mutex> lock(sessions_endpoint_mutex_);
+	sessions_endpoint_.erase(h);
+}
+
+
+template <typename Server>
+inline void gateway<Server>::receive(std::shared_ptr<std::vector<std::uint8_t>> buf, std::shared_ptr<endpoint_type> endpoint, boost::system::error_code const& e, std::size_t bytes_transfered) {
+	using namespace std;
+	using namespace placeholders;
+	using namespace boost::asio;
+
+	if (e)
+		throw;
+
+	// try to find existing endpoint->session*
+	auto session_it(sessions_endpoint_.find(*endpoint));
+	if (session_it == end(sessions_endpoint_)) {
+		// no endpoint found: verify cookie or send one
+		if (cookie_.verify(*endpoint, buffer(*const_cast<const vector<uint8_t>*>(buf.get()), bytes_transfered))) {
+			// cookie verified: create session
+			auto& session(*new session_type(io_, *this, *endpoint));
+			session.set(cookie_);
+			session.receive(buffer(*const_cast<const vector<uint8_t>*>(buf.get()), bytes_transfered), buffer(*buf));
+		} else
+			// send cookie
+			cookie_.send(bind(&gateway::send, this, _1, *endpoint, boost::system::error_code()), const_buffers_1(endpoint->data(), endpoint->size()));
+	} else
+		// found an existing endpoint->session*
+		std::get<1>(*session_it)->receive(buffer(*const_cast<const vector<uint8_t>*>(buf.get()), bytes_transfered), buffer(*buf));
+
+	// lock socket and register new receive
+	lock_guard<mutex> lock(socket_mutex_);
+	socket_.async_receive_from(buffer(*buf), *endpoint, bind(&gateway::receive, this, buf, endpoint, _1, _2));
+}
+
+template <typename Server>
+inline void gateway<Server>::insert(std::set<endpoint_type> const& set) {
+	new session_type(io_, *this, set);
+}
+
+template <typename Server>
+inline void gateway<Server>::insert(prefix_type const p, std::set<endpoint_type> const& set) {
+	if (sessions_prefix_.find(p) == std::end(sessions_prefix_))
+		// new prefix not already included
+		new session_type(io_, *this, set);
+}
+
+template <typename Server>
+inline void gateway<Server>::remove(endpoint_type const& e) {
+	auto it = sessions_endpoint_.find(e);
+	if (it != std::end(sessions_endpoint_))
+		delete std::get<1>(*it);
+}
+
+template <typename Server>
+inline void gateway<Server>::forward(boost::asio::const_buffers_1 b) {
+	using namespace std;
+
+	auto buf = boost::asio::buffer_cast<const uint8_t*>(b);
+	auto size = boost::asio::buffer_size(b);
+
+	// check endian
+	#ifdef BOOST_BIG_ENDIAN
+	constexpr std::uint64_t sitelocal_multicast(0xff05000000000000);
+	constexpr std::uint64_t linklocal_multicast(0xff02000000000000);
+	#else
+	constexpr std::uint64_t sitelocal_multicast(0x00000000000005ff);
+	constexpr std::uint64_t linklocal_multicast(0x00000000000002ff);
+	#endif
+
+	// check undefined states (no ipv6 packet)
+	if ((buf[0] & 0xF0) != 0x60)
+		return;
+
+	// determine prefix
+	std::uint64_t prefix = *reinterpret_cast<const uint64_t*>(buf + 24);
+
+	// send site-local multicast to all peers
+	if (prefix[0] == sitelocal_multicast[0] && prefix[1] == sitelocal_multicast[1]) {
+		for (auto& prefix : sessions_prefix_)
+			get<1>(prefix)->send(b);
+		return;
+	}
+
+	// send link-local multicast to all peers
+	if (prefix[0] == linklocal_multicast[0] && prefix[1] == linklocal_multicast[1]) {
+		for (auto& prefix : sessions_prefix_)
+			get<1>(prefix)->send(b);
+		return;
+	}
+
+	// send data to single session
+	auto session(sessions_prefix_.find(prefix));
+	if (session != end(sessions_prefix_))
+		get<1>(*session)->send(b);
+	else
+		// unknown prefix
+		;
+		//std::cerr << "unknown prefix: " << hex << prefix << " suffix: " << *reinterpret_cast<const uint64_t*>(buf + 24 + 8) << dec << std::endl;
+}
+
+} // namespace: <>

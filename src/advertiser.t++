@@ -1,0 +1,107 @@
+#ifdef IN_IDE_PARSER
+#include "advertiser.h++"
+#endif
+
+#include <boost/asio/ip/address_v6.hpp>
+#include <boost/asio/ip/multicast.hpp>
+#include <boost/asio/buffer.hpp>
+#include <functional>
+#include <boost/detail/endian.hpp>
+#include <fstream>
+#include <net/if.h>
+
+namespace {
+
+inline advertiser::advertiser(boost::asio::io_service& io, std::uint64_t const prefix) :
+	io_(io),
+	timer_(io),
+	socket_(io, boost::asio::ip::icmp::endpoint(boost::asio::ip::icmp::v6(), 0)),
+	endpoints_(),
+	buf_(),
+	prefix_(prefix)
+{
+	using namespace boost::asio;
+
+	// don't create anything just leaf
+	if (cfg::configuration["advertize"].empty())
+		return;
+
+	// setup sockets
+	socket_.native_non_blocking(true);
+	socket_.set_option(ip::multicast::hops(255));
+
+	// get all network interfaces to advertise on
+	for (auto& device : cfg::configuration["advertize"].as<std::vector<std::string>>()) {
+		auto address(ip::address::from_string("ff02::1").to_v6());
+		auto index(::if_nametoindex(device.data()));
+		if (!index)
+			continue;
+
+		address.scope_id(index);
+		endpoints_.emplace_back(address, 0);
+	}
+
+	// create big binary package with all the data
+	std::uint8_t* pre(reinterpret_cast<std::uint8_t*>(&prefix_));
+	// TODO: REWORD
+	std::array<std::uint8_t, 80> buf {
+		134, // type
+		0, // code
+		0, 0, // checksum
+		64, // hop limit
+		0, // flags
+		0, 0x1e, // router lifetime
+		0, 0, 0, 0, // reachable lifetime
+		0, 0, 0, 0, // retrans timer
+		0x03, 0x04, 0x08, 0x00, 0x00, 0x01, 0x51, 0x80, 0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //prefix
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x00, 0x01, 0x2c, 0x00, 0x00, 0x00, 0x78, 0x00, 0x00, 0x00, 0x00, pre[0], pre[1], pre[2], pre[3], pre[4], pre[5], pre[6], pre[7], 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00//, // prefix
+	};
+
+	buf_ = buf;
+}
+
+inline void advertiser::run() {
+	if (!cfg::configuration["lan-connect"].empty()) {
+
+		// configure ipv6 forwarding for linux
+		if (!cfg::configuration["advertize"].empty())
+			for (auto& device : cfg::configuration["advertize"].as<std::vector<std::string>>()) {
+				std::ofstream autoconf("/proc/sys/net/ipv6/conf/" + device + "/accept_ra");
+				autoconf << "2" << std::endl;
+			}
+		std::ofstream forward("/proc/sys/net/ipv6/conf/all/forwarding");
+		forward << "1" << std::endl;
+	}
+	send();
+}
+
+inline advertiser::~advertiser() {
+	if (cfg::configuration["advertize"].empty())
+		return;
+
+	// revoke prefix. set other lifetimes
+	buf_[21] = 0x00;
+	buf_[22] = 0x1c;
+	buf_[23] = 0x21;
+	buf_[26] = 0x00;
+	buf_[27] = 0x00;
+
+	buf_[54] = 0x1c;
+	buf_[55] = 0x21;
+	buf_[58] = 0x00;
+	buf_[59] = 0x00;
+
+	for (auto& endpoint : endpoints_)
+		socket_.send_to(boost::asio::buffer(buf_, sizeof(buf_)), endpoint);
+}
+
+inline void advertiser::send(boost::system::error_code const& e) {
+	// send data and sleep a little
+
+	for (auto& endpoint : endpoints_)
+		socket_.send_to(boost::asio::buffer(buf_, sizeof(buf_)), endpoint);
+	timer_.expires_from_now(std::chrono::seconds(3));
+	timer_.async_wait(std::bind(&advertiser::send, this, std::placeholders::_1));
+}
+
+} // namespace: <>
