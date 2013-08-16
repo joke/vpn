@@ -8,3 +8,7 @@ This is the README file of vpn² an Open Source VPN
 
 See the files ./INSTALL* for building and installation instructions.
 
+For more information consult the manual. It can be built either from
+within the doc folder or is available for online reading at 
+https://vpn2.readthedocs.org/
+
