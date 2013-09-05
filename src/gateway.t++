@@ -229,19 +229,19 @@ inline void gateway<Server>::forward(boost::asio::const_buffers_1 b) {
 	// determine prefix
 	std::uint64_t prefix = *reinterpret_cast<const uint64_t*>(buf + 24);
 
-	// send site-local multicast to all peers
-	if (prefix[0] == sitelocal_multicast[0] && prefix[1] == sitelocal_multicast[1]) {
-		for (auto& prefix : sessions_prefix_)
-			get<1>(prefix)->send(b);
-		return;
-	}
-
-	// send link-local multicast to all peers
-	if (prefix[0] == linklocal_multicast[0] && prefix[1] == linklocal_multicast[1]) {
-		for (auto& prefix : sessions_prefix_)
-			get<1>(prefix)->send(b);
-		return;
-	}
+// 	// send site-local multicast to all peers
+// 	if (prefix[0] == sitelocal_multicast[0] && prefix[1] == sitelocal_multicast[1]) {
+// 		for (auto& prefix : sessions_prefix_)
+// 			get<1>(prefix)->send(b);
+// 		return;
+// 	}
+//
+// 	// send link-local multicast to all peers
+// 	if (prefix[0] == linklocal_multicast[0] && prefix[1] == linklocal_multicast[1]) {
+// 		for (auto& prefix : sessions_prefix_)
+// 			get<1>(prefix)->send(b);
+// 		return;
+// 	}
 
 	// send data to single session
 	auto session(sessions_prefix_.find(prefix));
