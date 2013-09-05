@@ -26,10 +26,8 @@ target_link_libraries(vpn ${GnuTLS_LIBRARIES} ${Boost_LIBRARIES} ${GPGME_LIBRARI
 install(TARGETS vpn DESTINATION "${CMAKE_INSTALL_PREFIX}/sbin")
 
 if(USE_INTERNAL_BOOST)
-	add_dependencies(vpn Boost)
+	add_dependencies(vpn libboost)
 endif()
 if(USE_INTERNAL_GNUTLS)
 	add_dependencies(vpn libgnutls)
 endif()
-
-add_custom_command(TARGET vpn POST_BUILD COMMAND /home/joke/bin/compilation_finished)
