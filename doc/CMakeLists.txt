@@ -15,7 +15,7 @@ find_package(Sphinx)
 if(SPHINX_FOUND)
 
 	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/conf.py ${CMAKE_CURRENT_BINARY_DIR}/build/conf.py @ONLY)
-	add_custom_target(manual ALL
+	add_custom_target(manual
 		${SPHINX_EXECUTABLE}
 		-a -q -b html
 		-c ${CMAKE_CURRENT_BINARY_DIR}/build
@@ -24,7 +24,7 @@ if(SPHINX_FOUND)
 		${CMAKE_CURRENT_BINARY_DIR}/manual
 		COMMENT "Building HTML documentation with Sphinx"
 	)
-	add_custom_target(manual-dir ALL
+	add_custom_target(manual-dir
 		${SPHINX_EXECUTABLE}
 		-a -q -b dirhtml
 		-c ${CMAKE_CURRENT_BINARY_DIR}/build
@@ -33,7 +33,7 @@ if(SPHINX_FOUND)
 		${CMAKE_CURRENT_BINARY_DIR}/manual
 		COMMENT "Building HTML documentation with Sphinx"
 	)
-	add_custom_target(manual-single ALL
+	add_custom_target(manual-single
 		${SPHINX_EXECUTABLE}
 		-a -q -b singlehtml
 		-c ${CMAKE_CURRENT_BINARY_DIR}/build
