@@ -36,14 +36,14 @@ int main(int const argc, char const* const* const argv) {
 		try {
 			// create server
 			server<ip::udp, local::stream_protocol> server(io);
-		} catch (std::error_code const& e) {
-			std::cerr << e.message() << std::endl;
-			std::exit(EXIT_FAILURE);
-		} catch (std::exception const& e) {
-			std::cerr << e.what() << std::endl;
-			std::exit(EXIT_FAILURE);
+		} catch (error_code const& e) {
+			cerr << e.message() << endl;
+			exit(EXIT_FAILURE);
+		} catch (exception const& e) {
+			cerr << e.what() << endl;
+			exit(EXIT_FAILURE);
 		} catch (...) {
-			std::exit(EXIT_FAILURE);
+			exit(EXIT_FAILURE);
 		}
 	} else if (configuration["mode"].as<string>() == "control") {
 		local::stream_protocol::endpoint socket{configuration["socket"].as<string>()};
