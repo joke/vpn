@@ -169,7 +169,10 @@ html_show_sourcelink = False
 #html_use_opensearch = ''
 
 # This is the file name suffix for HTML files (e.g. ".xhtml").
-html_file_suffix = '.xhtml'
+if os.environ.get('READTHEDOCS', None):
+	html_file_suffix = '.html'
+else:
+	html_file_suffix = '.xhtml'
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'vpndoc'
