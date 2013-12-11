@@ -30,8 +30,8 @@ on compile time switches. Refer to their licences for further information.
 Project Organization
 ====================
 
-This project uses `github <http://github.com/>`_ for source code hosting and
-`readthedocs <http://readthedocs.org/>`_ for building the documentation.
+This project uses `GitHub`_ for source code hosting and
+`Read the Docs <http://readthedocs.org/>`_ for building the documentation.
 
 Obtaining the source code
 -------------------------
@@ -41,11 +41,10 @@ Obtaining the source code
 
 Since this software is in early stages of development official releases have
 been made. Release tarballs are not available yet. Nevertheless a zip-snapshot of
-the current development version can the downloaded via `github
-<http://github.com>`_.
+the current development version can the downloaded via `GitHub`_.
 
 vpn² uses git as version control system. The git repository is available on
-`github <http://github.com/joke/vpn>`_. Feel free to contribute.
+https://github.com/joke/vpn. Feel free to contribute.
 
 .. _reporting_bugs:
 
@@ -55,6 +54,8 @@ Reporting Bugs
 .. index::
 	bugs
 
-Bugs should be reported on the projects `github
-<http://github.com/joke/vpn/issues>`_ presence.
+Bugs should be reported on the projects https://github.com/joke/vpn/issues presence.
 
+
+.. _GitHub: https://github.com/
+.. _githubissues: https://github.com/joke/vpn/issues
