@@ -27,12 +27,12 @@ namespace {
 template <typename GatewayProtocol, typename ControllerProtocol>
 class server {
 public:
-	typedef gateway<server> gateway_type;
-	typedef GatewayProtocol gateway_protocol_type;
-	typedef ControllerProtocol controller_protocol_type;
-	typedef controller<controller_protocol_type, gateway_type> controller_type;
-	typedef netdevice<server> netdevice_type;
-	typedef std::uint64_t prefix_type;
+	using gateway_type = gateway<server>;
+	using gateway_protocol_type = GatewayProtocol;
+	using controller_protocol_type = ControllerProtocol;
+	using controller_type = controller<controller_protocol_type, gateway_type>;
+	using netdevice_type = netdevice<server>;
+	using prefix_type = std::uint64_t;
 
 	//! create a server instance
 	explicit server(boost::asio::io_service&);

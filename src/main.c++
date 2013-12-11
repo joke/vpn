@@ -1,5 +1,6 @@
 #define BOOST_BIND_NO_PLACEHOLDERS
 #include <functional>
+
 namespace boost {
 	// include std::placeholders (c++11) in boost namespace
 	using namespace std::placeholders;
@@ -35,7 +36,7 @@ int main(int const argc, char const* const* const argv) {
 	if (configuration["mode"].as<string>() == "server") {
 		try {
 			// create server
-			server<ip::udp, local::stream_protocol> server(io);
+			server<ip::udp, local::stream_protocol> server{io};
 		} catch (error_code const& e) {
 			cerr << e.message() << endl;
 			exit(EXIT_FAILURE);

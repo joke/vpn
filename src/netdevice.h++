@@ -13,7 +13,7 @@ namespace {
 template <typename Server>
 class netdevice {
 public:
-	typedef typename Server::gateway_type& gateway_type;
+	using gateway_type = typename Server::gateway_type&;
 
 	//! create netdevice
 	explicit netdevice(boost::asio::io_service&, gateway_type&);
@@ -53,7 +53,7 @@ protected:
 	boost::asio::posix::stream_descriptor stream_descriptor_; //!< stream descriptor of tuntap
 	std::mutex stream_descriptor_mutex_; //!< stream_descriptor should be mutexed
 
-	// 
+	//
 	class ioctl {
 	public:
 		ioctl(int const name, void* data);

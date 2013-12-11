@@ -12,14 +12,14 @@ namespace {
 template <typename Gateway>
 class session {
 public:
-	typedef Gateway gateway_type;
-	typedef typename Gateway::protocol_type protocol_type;
-	typedef typename Gateway::endpoint_type endpoint_type;
-	typedef typename Gateway::prefix_type prefix_type;
-	typedef typename Gateway::endpoint_handle_type endpoint_handle_type;
-	typedef typename Gateway::prefix_handle_type prefix_handle_type;
-	typedef typename std::map<boost::asio::ip::udp::endpoint, session*>::iterator endpoint_iterator_type;
-	typedef typename std::map<std::uint64_t, session*>::iterator prefix_iterator_type;
+	using gateway_type = Gateway;
+	using protocol_type = typename Gateway::protocol_type;
+	using endpoint_type = typename Gateway::endpoint_type;
+	using prefix_type = typename Gateway::prefix_type;
+	using endpoint_handle_type = typename Gateway::endpoint_handle_type;
+	using prefix_handle_type = typename Gateway::prefix_handle_type;
+	using endpoint_iterator_type = typename std::map<boost::asio::ip::udp::endpoint, session*>::iterator;
+	using prefix_iterator_type = typename std::map<std::uint64_t, session*>::iterator;
 
 	//! create client session with a set of endpoints to try to connect with
 	explicit session(boost::asio::io_service&, Gateway& g, std::set<endpoint_type> const&);

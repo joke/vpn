@@ -20,18 +20,18 @@ namespace {
 template <typename Server>
 class gateway {
 public:
-	typedef typename Server::gateway_protocol_type protocol_type;
-	typedef typename Server::netdevice_type netdevice_type;
-	typedef typename Server::prefix_type prefix_type;
-	typedef typename protocol_type::socket socket_type;
-	typedef typename protocol_type::endpoint endpoint_type;
-	typedef typename protocol_type::resolver resolver_type;
-	typedef typename resolver_type::query query_type;
-	typedef session<gateway> session_type;
-	typedef std::map<endpoint_type, session_type*> sessions_endpoint_type;
-	typedef std::map<prefix_type, session_type*> sessions_prefix_type;
-	typedef typename sessions_prefix_type::const_iterator prefix_handle_type;
-	typedef typename sessions_endpoint_type::const_iterator endpoint_handle_type;
+	using protocol_type = typename Server::gateway_protocol_type;
+	using netdevice_type = typename Server::netdevice_type;
+	using prefix_type = typename Server::prefix_type;
+	using socket_type = typename protocol_type::socket;
+	using endpoint_type = typename protocol_type::endpoint;
+	using resolver_type = typename protocol_type::resolver;
+	using query_type = typename resolver_type::query;
+	using session_type = session<gateway>;
+	using sessions_endpoint_type = std::map<endpoint_type, session_type*>;
+	using sessions_prefix_type = std::map<prefix_type, session_type*>;
+	using prefix_handle_type = typename sessions_prefix_type::const_iterator;
+	using endpoint_handle_type = typename sessions_endpoint_type::const_iterator;
 
 	//! create sockets and stuff
 	explicit gateway(boost::asio::io_service& s, netdevice_type& n);
