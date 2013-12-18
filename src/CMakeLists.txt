@@ -1,7 +1,7 @@
 if(CMAKE_COMPILER_IS_GNUCXX)
-	set(CMAKE_CXX_FLAGS "-std=c++11 -pipe")
+	set(CMAKE_CXX_FLAGS "-std=c++11")
 	set(CMAKE_CXX_FLAGS_RELEASE "-O2 -s -g0")
-	set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb -pg -pedantic -D_GLIBCXX_CONCEPT_CHECK -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -Wextra -Wall -Wunused")
+	set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb -pg -pedantic -D_GLIBCXX_CONCEPT_CHECK -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC")# -Wextra -Wall -Wunused")
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 endif()
 
@@ -20,7 +20,7 @@ if (NOT IDN2_LIBRARIES)
 endif()
 
 
-add_executable(vpn main.c++ program_options.c++)
+add_executable(vpn main.c++ configuration.c++)
 target_link_libraries(vpn ${GnuTLS_LIBRARIES} ${Boost_LIBRARIES} ${GPGME_LIBRARIES} ${IDN2_LIBRARIES})
 
 install(TARGETS vpn DESTINATION "${CMAKE_INSTALL_PREFIX}/sbin")

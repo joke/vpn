@@ -38,6 +38,7 @@ void load(Archive& ar, boost::asio::ip::basic_endpoint<InternetProtocol>&, unsig
 } // namespace: serialization
 } // namespace: boost
 
+
 #ifndef IN_IDE_PARSERER
 #include "convert.t++"
 #endif

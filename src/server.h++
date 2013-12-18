@@ -1,60 +1,79 @@
 #ifndef server_h
 #define server_h
 
-#include <boost/asio/io_service.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <boost/asio/streambuf.hpp>
-#include <boost/asio/local/stream_protocol.hpp>
-#include <boost/asio/posix/stream_descriptor.hpp>
-
-#include <functional>
-#include <map>
-#include <cstdint>
-#include <forward_list>
-#include <memory>
-#include <thread>
-
 #include "signal.h++"
-#include "gateway.h++"
-#include "controller.h++"
 #include "netdevice.h++"
-#include "advertiser.h++"
-#include "encryption.h++"
+#include "gateway.h++"
+#include <boost/concept_check.hpp>
+
+#include <forward_list>
+#include <thread>
 
 namespace {
 
-//! the server is the main entity binding all the other classes together
-template <typename GatewayProtocol, typename ControllerProtocol>
-class server {
-public:
-	using gateway_type = gateway<server>;
-	using gateway_protocol_type = GatewayProtocol;
-	using controller_protocol_type = ControllerProtocol;
-	using controller_type = controller<controller_protocol_type, gateway_type>;
-	using netdevice_type = netdevice<server>;
-	using prefix_type = std::uint64_t;
+template <bool MultiThreaded>
+class ThreadPool;
 
-	//! create a server instance
-	explicit server(boost::asio::io_service&);
+template <>
+class ThreadPool<true> {
+public:
+	explicit ThreadPool(std::size_t threads = 10) : thread_cnt_{threads}, threads_{} {
+	}
+
+	template <typename Function>
+	void run(Function&& f) {
+		for (std::size_t i{0}; i != thread_cnt_; ++i)
+			threads_.emplace_front(f);
+
+		for (auto& thread : threads_)
+			thread.join();
+	}
 
 protected:
-	//! start the server. run() other components and start thread pool
-	void run();
+	std::size_t thread_cnt_;
+	std::forward_list<std::thread> threads_;
+};
 
-	boost::asio::io_service& io_; //!< io server proactor
-	signal signal_; //!< signal handler
+template <>
+class ThreadPool<false> {
+public:
+	template <typename Function>
+	void run(Function&& f) {
+		f();
+	}
+};
 
-	gateway_type gateway_; //!< gateway used to communicate with the internet
-	controller_type controller_; //!< controller to respond to command line
-	netdevice_type netdevice_; //!< netdevice handles tun/tap
-	advertiser advertiser_; //!< advertize prefix to lan
-	std::forward_list<std::thread> thread_pool_; //!< the thread pool
+template <typename GatewayProtocol, typename ControllerProtocol, bool Threading = true>
+class server {
+public:
+	explicit server();
+	~server();
+
+protected:
+
+	void send_local(boost::asio::const_buffers_1 buffer) { std::cerr << "send_local" << std::endl; }
+	void send_remote(boost::asio::const_buffers_1 buffer) {
+		std::cerr << "send_remote: " << std::this_thread::get_id() << std::endl;
+		std::this_thread::sleep_for(std::chrono::seconds(10));
+	}
+	void received_local(boost::asio::const_buffers_1 buffer) { std::cerr << "received_local" << std::endl; }
+	void received_remote(boost::asio::const_buffers_1 buffer) { std::cerr << "received_remote" << std::endl; }
+
+	using send_local_type = decltype(std::bind(&server::send_local, std::declval<server*>(), std::placeholders::_1));
+	using send_remote_type = decltype(std::bind(&server::send_remote, std::declval<server*>(), std::placeholders::_1));
+	using received_local_type = decltype(std::bind(&server::received_local, std::declval<server*>(), std::placeholders::_1));
+	using received_remote_type = decltype(std::bind(&server::received_remote, std::declval<server*>(), std::placeholders::_1));
+
+	boost::asio::io_service io_; //!< the io service
+	ThreadPool<Threading> thread_pool_;
+	signal signal_; //!< handles all kind of signals
+	netdevice<send_remote_type, received_local_type> netdevice_; //!< handles packets from virtual network device
+	gateway<GatewayProtocol, send_local_type, received_remote_type> gateway_;
 
 private:
 	explicit server(server const&) = delete;
 	explicit server(server&&) = delete;
-	server& operator=(server const&) = delete;
-	server& operator=(server&&) = delete;
+	server const operator=(server const&) = delete;
 };
 
 } // namespace: <>

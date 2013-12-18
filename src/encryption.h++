@@ -12,7 +12,7 @@
 #include <boost/asio.hpp>
 #include <gpgme.h>
 
-#include "program_options.h++"
+#include "configuration.h++"
 
 namespace gnutls {
 namespace {

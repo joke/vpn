@@ -5,7 +5,7 @@
 
 namespace cfg {
 
-extern boost::program_options::variables_map configuration;
+extern boost::program_options::variables_map parameters;
 
 //! parses command line using boost program_options
 //! \brief parses command line

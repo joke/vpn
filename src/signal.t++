@@ -13,22 +13,21 @@ inline signal::signal(boost::asio::io_service& io) : io_(io), set_(io_) {
 	set_.add(SIGTERM);
 	set_.add(SIGINT);
 	set_.add(SIGHUP);
-	set_.async_wait(bind(&signal::handler, this, _1, _2));
+	set_.async_wait(bind(&signal::shutdown, this, _1, _2));
 }
 
-inline void signal::handler(const boost::system::error_code& e, int const signal) {
+inline void signal::shutdown(const boost::system::error_code& e, int const signal) {
 	using namespace std;
 	using namespace placeholders;
 
 	// stop a any signal for now. later more
-
 	if (!e) {
 		if (signal == SIGINT)
 			io_.stop();
 		else if (signal == SIGTERM)
 			io_.stop();
 	} else
-		set_.async_wait(bind(&signal::handler, this, _1, _2));
+		set_.async_wait(bind(&signal::shutdown, this, _1, _2));
 }
 
 } // namespace: <>

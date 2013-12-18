@@ -10,18 +10,16 @@
 namespace {
 
 //! netdevice handles the tun/tap device
-template <typename Server>
+template <typename SendHandler, typename ReceiveHandler>
 class netdevice {
 public:
-	using gateway_type = typename Server::gateway_type&;
+	//using gateway_type = typename Server::gateway_type&;
 
 	//! create netdevice
-	explicit netdevice(boost::asio::io_service&, gateway_type&);
+	explicit netdevice(boost::asio::io_service&, SendHandler, ReceiveHandler);
 	//! just destruction
 	~netdevice() noexcept;
 
-	//! create a buffer (called by thread) and run
-	void run();
 	//! check if the device is up
 	bool is_up() const;
 	//! query the mtu
@@ -35,20 +33,18 @@ public:
 	//! set routing prefix
 	void route(boost::asio::ip::address_v6 const&, std::uint8_t const prefix);
 	//! send data to device
-	void send(boost::asio::const_buffers_1);
+	void write(boost::asio::const_buffers_1);
 	//! get name of device
 	std::string const& name() noexcept;
 
 protected:
 	//! get device index
 	int ifindex() const;
-	//! accept now connection
-	void accept(std::shared_ptr<std::vector<std::uint8_t>> buffer);
 	//! read data and forward it
-	void read(std::shared_ptr<std::vector<std::uint8_t>> buffer, boost::system::error_code const& error, std::size_t bytes_transferred);
+	void read(boost::system::error_code const&, std::size_t const bytes_transferred, std::shared_ptr<std::vector<std::uint8_t>>);
 
 	boost::asio::io_service& io_; //!< proactor
-	gateway_type gateway_; //!< the gateway. forward data there
+	//gateway_type gateway_; //!< the gateway. forward data there
 	std::string name_; //!< string holding device name
 	boost::asio::posix::stream_descriptor stream_descriptor_; //!< stream descriptor of tuntap
 	std::mutex stream_descriptor_mutex_; //!< stream_descriptor should be mutexed
@@ -70,6 +66,9 @@ private:
 	explicit netdevice(netdevice&&) = delete;
 	netdevice& operator=(netdevice const&) = delete;
 	netdevice& operator=(netdevice&&) = delete;
+
+	SendHandler send_;
+	ReceiveHandler receive_;
 };
 
 } // namespace: <>

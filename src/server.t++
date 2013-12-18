@@ -3,59 +3,23 @@
 #endif
 
 #include <functional>
-#include <memory>
-#include <functional>
-#include <tuple>
-#include <boost/asio/read.hpp>
-#include <boost/asio/read_until.hpp>
-#include "program_options.h++"
-#include "encryption.h++"
-#include "controller_protocol.h++"
 
 namespace {
 
-template <typename GatewayProtocol, typename ControllerProtocol>
-inline server<GatewayProtocol, ControllerProtocol>::server(boost::asio::io_service& io) :
-	io_(io),
-	signal_(io_),
-	gateway_(io_, netdevice_),
-	controller_(io_, gateway_),
-	netdevice_(io_, gateway_),
-	advertiser_(io_, gateway_.prefix())
+template <typename GatewayProtocol, typename ControllerProtocol, bool Threaded>
+inline server<GatewayProtocol, ControllerProtocol, Threaded>::server() :
+	io_(),
+	thread_pool_{},
+	signal_{io_},
+	netdevice_{io_, std::bind(&server::send_remote, this, std::placeholders::_1), std::bind(&server::received_local, this, std::placeholders::_1)},
+	gateway_(io_, std::bind(&server::send_local, this, std::placeholders::_1), std::bind(&server::received_remote, this, std::placeholders::_1))
 {
-	// create everything a server needs
-	controller_.run();
-	if (!cfg::configuration["advertize"].empty())
-		// start advertiser in current process
-		advertiser_.run();
-
-	// do autoconnect if we need to
-	if (!cfg::configuration["autoconnect"].empty()) {
-		auto finger(to_hex(gateway_.fingerprint().data(), gateway_.fingerprint().size(), true));
-		std::forward_list<std::tuple<std::string, std::set<boost::asio::ip::udp::endpoint>>> peers;
-		gpgme::context context;
-		context.vpn_peers(peers);
-		for (auto& peer : peers)
-			if (std::get<0>(peer) != finger)
-				gateway_.insert(std::get<1>(peer));
-	}
-
-	// start thread pool
-	if (cfg::configuration["threads"].as<size_t>() > 0) {
-		for (auto threads(cfg::configuration["threads"].as<size_t>()); threads != 0; --threads)
-			thread_pool_.emplace_front(std::bind(&server::run, this));
-		for (auto& thread : thread_pool_)
-			thread.join();
-	} else
-		run();
+	thread_pool_.run(std::bind(static_cast<std::size_t(boost::asio::io_service::*)()>(&boost::asio::io_service::run), std::ref(io_)));
 }
 
-template <typename GatewayProtocol, typename ControllerProtocol>
-inline void server<GatewayProtocol, ControllerProtocol>::run() {
-	// register proactor callbacks and start proactor
-	gateway_.run();
-	netdevice_.run();
-	io_.run();
+template <typename GatewayProtocol, typename ControllerProtocol, bool Threaded>
+inline server<GatewayProtocol, ControllerProtocol, Threaded>::~server() {
+// 	run();
 }
 
 } // namespace: <>

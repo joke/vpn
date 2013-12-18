@@ -12,7 +12,7 @@
 #include "client.h++"
 
 namespace {
-
+/*
 template <typename Gateway>
 inline session<Gateway>::session(boost::asio::io_service& io, Gateway& g, endpoint_type const& e, std::set<endpoint_type> const& es, bool server) :
 	io_(io),
@@ -412,6 +412,6 @@ inline int session<Gateway>::verify(gnutls_session_t s) {
 	se.verified_ = true;
 
 	return 0;
-}
+}*/
 
 } // namespace: <>

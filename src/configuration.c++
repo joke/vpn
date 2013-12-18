@@ -1,4 +1,4 @@
-#include "program_options.h++"
+#include "configuration.h++"
 
 #include <vector>
 #include <cstdint>
@@ -10,7 +10,7 @@
 
 namespace cfg {
 
-boost::program_options::variables_map configuration;
+boost::program_options::variables_map parameters;
 
 void parse_command_line(int const argc, char const* const* const argv) {
 	using namespace std;
@@ -19,7 +19,7 @@ void parse_command_line(int const argc, char const* const* const argv) {
 	options_description cmdline("commandline");
 	cmdline.add_options()
 		("help", "show help message")
-		("config", value<string>(), "configuration file")
+		("config", value<string>(), "parameters file")
 		("mode", value<string>()->required(), "mode to run in: server|control")
 	;
 
@@ -65,27 +65,27 @@ void parse_command_line(int const argc, char const* const* const argv) {
 	options_description groups;
 	groups.add(cmdline);
 
-	store(command_line_parser(argc, argv).options(cmdline).allow_unregistered().run(), configuration);
+	store(command_line_parser(argc, argv).options(cmdline).allow_unregistered().run(), parameters);
 
-	if (!configuration["mode"].empty()) {
-		if (configuration["mode"].as<string>() == "server")
+	if (!parameters["mode"].empty()) {
+		if (parameters["mode"].as<string>() == "server")
 			groups.add(server).add(encryption).add(gnupg);
 
-		if (configuration["mode"].as<string>() == "control")
+		if (parameters["mode"].as<string>() == "control")
 			groups.add(controller);
 
-		if (!configuration["config"].empty())
-			store(parse_config_file<char>(configuration["config"].as<string>().c_str(), groups, false), configuration);
+		if (!parameters["config"].empty())
+			store(parse_config_file<char>(parameters["config"].as<string>().c_str(), groups, false), parameters);
 
-		store(parse_command_line(argc, argv, groups), configuration);
+		store(parse_command_line(argc, argv, groups), parameters);
 	}
 
-	if (configuration.count("help")) {
+	if (parameters.count("help")) {
 		cout << groups << endl;
 		exit(EXIT_FAILURE);
 	}
 
-	notify(configuration);
+	notify(parameters);
 }
 
 } // namespace cfg
