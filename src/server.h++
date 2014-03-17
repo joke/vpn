@@ -9,7 +9,6 @@
 #include <forward_list>
 #include <thread>
 
-namespace {
 
 template <bool MultiThreaded>
 class ThreadPool;
@@ -76,7 +75,6 @@ private:
 	server const operator=(server const&) = delete;
 };
 
-} // namespace: <>
 
 #ifndef IN_IDE_PARSERER
 #include "server.t++"

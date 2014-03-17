@@ -6,7 +6,6 @@
 #include <unordered_map>
 #include <vector>
 
-namespace {
 
 template <typename Protocol, typename SendHandler, typename ReceiveHandler>
 class gateway;
@@ -48,7 +47,6 @@ protected:
 	ReceiveHandler receive_;
 };
 
-} // namespace: <>
 
 #ifndef IN_IDE_PARSERER
 #include "gateway.t++"

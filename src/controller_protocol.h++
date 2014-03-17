@@ -8,7 +8,6 @@
 #include "convert.h++"
 
 
-namespace {
 
 //! class used as interface between commandline
 class query {
@@ -23,7 +22,6 @@ public:
 	std::list<boost::asio::ip::udp::endpoint> endpoints_; //!< list of all the endpoints
 };
 
-} // namespace: <>
 
 #ifndef IN_IDE_PARSERER
 #include "controller_protocol.t++"

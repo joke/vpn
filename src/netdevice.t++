@@ -19,7 +19,6 @@
 #include "utility.h++"
 
 
-namespace {
 
 template <typename SendHandler, typename ReceiveHandler>
 inline netdevice<SendHandler, ReceiveHandler>::netdevice(boost::asio::io_service& io, SendHandler send, ReceiveHandler receive) :
@@ -221,5 +220,4 @@ inline void* netdevice<SendHandler, ReceiveHandler>::ioctl::data() {
 	return data_;
 }
 
-} // namespace: <>
 

@@ -41,7 +41,6 @@ inline std::basic_istream<_CharT, _Traits>& operator<<(std::basic_istream<_CharT
 
 namespace boost {
 namespace serialization {
-namespace {
 
 template <typename Archive, typename InternetProtocol>
 inline void save(Archive& ar, boost::asio::ip::basic_endpoint<InternetProtocol> const& e, unsigned int const) {
@@ -68,6 +67,5 @@ inline void serialize(Archive& ar, boost::asio::ip::basic_endpoint<InternetProto
 	split_free(ar, e, file_version);
 }
 
-} // namespace: <>
 } // namespace: serialization
 } // namespace: boost

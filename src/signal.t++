@@ -2,7 +2,6 @@
 #include "signal.h++"
 #endif
 
-namespace {
 
 inline signal::signal(boost::asio::io_service& io) : io_(io), set_(io_) {
 	using namespace boost::asio;
@@ -30,4 +29,3 @@ inline void signal::shutdown(const boost::system::error_code& e, int const signa
 		set_.async_wait(bind(&signal::shutdown, this, _1, _2));
 }
 
-} // namespace: <>

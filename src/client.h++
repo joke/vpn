@@ -14,7 +14,6 @@
 #include <boost/asio/write.hpp>
 #include <sstream>
 
-namespace {
 
 //! the client handles the commandline interface to communicate with a running server
 template <typename Protocol>
@@ -43,7 +42,6 @@ private:
 	client& operator=(client&&) = delete;
 };
 
-} // namespace: <>
 
 #ifndef IN_IDE_PARSERER
 #include "client.t++"

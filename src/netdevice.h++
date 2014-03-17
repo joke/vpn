@@ -7,7 +7,6 @@
 #include <boost/asio/posix/stream_descriptor.hpp>
 #include <mutex>
 
-namespace {
 
 //! netdevice handles the tun/tap device
 template <typename SendHandler, typename ReceiveHandler>
@@ -71,7 +70,6 @@ private:
 	ReceiveHandler receive_;
 };
 
-} // namespace: <>
 
 #ifndef IN_IDE_PARSERER
 #include "netdevice.t++"

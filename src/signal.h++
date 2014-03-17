@@ -5,7 +5,6 @@
 #include <boost/asio/signal_set.hpp>
 #include <boost/config/no_tr1/complex.hpp>
 
-namespace {
 
 //! handle all kind of signals in the client might encounter and act on accordingly
 class signal {
@@ -27,7 +26,6 @@ private:
 	signal const operator=(signal const&) = delete;
 };
 
-} // namespace: <>
 
 #ifndef IN_IDE_PARSERER
 #include "signal.t++"

@@ -7,7 +7,6 @@
 #include <boost/asio/ip/icmp.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
 
-namespace {
 
 //! the advertiser sends router advertise packages SLAAC
 class advertiser {
@@ -37,7 +36,6 @@ private:
 	advertiser& operator=(advertiser&&) = delete;
 };
 
-} // namespace: <>
 
 #ifndef IN_IDE_PARSERER
 #include "advertiser.t++"

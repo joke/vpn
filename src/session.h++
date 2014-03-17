@@ -9,7 +9,6 @@
 
 
 namespace std {
-// namespace {
 
 template <>
 class hash<boost::asio::ip::basic_endpoint<boost::asio::ip::udp>> {
@@ -19,11 +18,9 @@ public:
 	}
 };
 
-// } // namespace: <>
 } // namespace: std
 
 
-namespace {
 
 // template <typename Gateway>
 // class session {
@@ -144,7 +141,6 @@ void receive() {}
 
 };
 
-} // namespace: <>
 
 #ifndef IN_IDE_PARSERER
 #include "session.t++"

@@ -20,7 +20,6 @@ std::basic_istream<_CharT, _Traits>& operator<<(std::basic_istream<_CharT, _Trai
 
 namespace boost {
 namespace serialization {
-namespace {
 
 //! the serialization function for boost
 template <typename Archive, typename InternetProtocol>
@@ -34,7 +33,6 @@ void save(Archive& ar, boost::asio::ip::basic_endpoint<InternetProtocol> const&,
 template <typename Archive, typename InternetProtocol>
 void load(Archive& ar, boost::asio::ip::basic_endpoint<InternetProtocol>&, unsigned int const version);
 
-} // namespace: <>
 } // namespace: serialization
 } // namespace: boost
 

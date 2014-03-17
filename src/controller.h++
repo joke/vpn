@@ -10,7 +10,6 @@
 #include "gateway.h++"
 #include "controller_protocol.h++"
 
-namespace {
 
 //! the controller is the connection to the command line interface within the server
 template <typename Protocol, typename Gateway>
@@ -48,7 +47,6 @@ private:
 	controller operator=(controller&&) = delete;
 };
 
-} // namespace: <>
 
 #ifndef IN_IDE_PARSERER
 #include "controller.t++"

@@ -19,7 +19,6 @@
 #include "convert.h++"
 
 // namespace gnutls {
-// namespace {
 // 
 // enum class errc {
 // 	again = GNUTLS_E_AGAIN,
@@ -344,10 +343,8 @@
 // 	});
 // }
 //
-// } // namespace: <>
 //
 // namespace openpgp {
-// namespace {
 //
 // inline certificate::certificate(datum const& d) : certificate_() {
 // 	// TODO return val
@@ -416,12 +413,10 @@
 // 	wrap_error(::gnutls_openpgp_privkey_set_preferred_key_id(privatekey_, keyid.data()));
 // }
 //
-// } // namespace: <>
 // } // namespace: openpgp
 // } // namespace: gnutls
 //
 // namespace gpgme {
-// namespace {
 //
 // inline data::data() : data_() {
 // 	::gpgme_data_new(&data_);
@@ -549,7 +544,6 @@
 // 	}
 // }
 //
-// } // namespace: <>
 // } // namespace: gpgme
 //
 //

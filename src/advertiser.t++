@@ -10,7 +10,5 @@
 #include <fstream>
 #include <net/if.h>
 
-namespace {
 
 
-} // namespace: <>

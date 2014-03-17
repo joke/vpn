@@ -2,7 +2,6 @@
 #include "client.h++"
 #endif
 
-namespace {
 
 template <typename Protocol>
 client<Protocol>::client(boost::asio::io_service& s, typename Protocol::endpoint const& e) : stream_(e) {
@@ -86,5 +85,4 @@ inline void client<Protocol>::submit(query& query) {
 }
 
 
-} // namespace: <>
 

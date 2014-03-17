@@ -15,7 +15,6 @@
 #include "configuration.h++"
 
 namespace gnutls {
-namespace {
 
 //! enum with all the gnutls error codes
 enum class errc;
@@ -44,18 +43,14 @@ private:
 	static global* global_;
 };
 
-} // namespace: <>
 
 namespace openpgp {
-namespace {
 
 class certificate;
 class privatekey;
 
-} // namespace: <>
 } // namespace: openpgp
 
-namespace {
 
 //! wrapper around gnutls_datum_t
 class datum {
@@ -122,10 +117,8 @@ protected:
 	gnutls_dtls_prestate_st prestate_;
 };
 
-} // namespace: <>
 
 namespace openpgp {
-namespace {
 
 //! openpgp certificate in gnutls
 class certificate {
@@ -173,12 +166,10 @@ private:
 	privatekey& operator=(privatekey&&) = delete;
 };
 
-} // namespace: <>
 } // namespace: openpgp
 } // namespace: gnutls
 
 namespace gpgme {
-namespace {
 
 //! wrapper around gpgme data
 class data {
@@ -245,7 +236,6 @@ private:
 	context& operator=(context&&) = delete;
 };
 
-} // namespace: <>
 } // namespace: gpgme
 
 
