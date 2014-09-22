@@ -4,17 +4,12 @@
 #include "signal.h++"
 #include "netdevice.h++"
 #include "gateway.h++"
-#include <boost/concept_check.hpp>
 
 #include <forward_list>
 #include <thread>
 
 
-template <bool MultiThreaded>
-class ThreadPool;
-
-template <>
-class ThreadPool<true> {
+class ThreadPool {
 public:
 	explicit ThreadPool(std::size_t threads = 10) : thread_cnt_{threads}, threads_{} {
 	}
@@ -33,8 +28,7 @@ protected:
 	std::forward_list<std::thread> threads_;
 };
 
-template <>
-class ThreadPool<false> {
+class SingleThreaded {
 public:
 	template <typename Function>
 	void run(Function&& f) {
@@ -42,18 +36,22 @@ public:
 	}
 };
 
-template <typename GatewayProtocol, typename ControllerProtocol, bool Threading = true>
-class server {
+template <typename GatewayProtocol, typename ControllerProtocol, typename ThreadingPolicy>
+class server : protected ThreadingPolicy {
 public:
-	explicit server();
+	explicit server() = delete;
+	explicit server(server const&) = delete;
+	explicit server(server&&) = delete;
+	explicit server(gnutls::credentials&&, gnutls::priorities&&);
 	~server();
 
-protected:
+	server& operator=(server const&) = delete;
 
+protected:
 	void send_local(boost::asio::const_buffers_1 buffer) { std::cerr << "send_local" << std::endl; }
 	void send_remote(boost::asio::const_buffers_1 buffer) {
 		std::cerr << "send_remote: " << std::this_thread::get_id() << std::endl;
-		std::this_thread::sleep_for(std::chrono::seconds(10));
+		std::this_thread::sleep_for(std::chrono::seconds(3));
 	}
 	void received_local(boost::asio::const_buffers_1 buffer) { std::cerr << "received_local" << std::endl; }
 	void received_remote(boost::asio::const_buffers_1 buffer) { std::cerr << "received_remote" << std::endl; }
@@ -63,16 +61,22 @@ protected:
 	using received_local_type = decltype(std::bind(&server::received_local, std::declval<server*>(), std::placeholders::_1));
 	using received_remote_type = decltype(std::bind(&server::received_remote, std::declval<server*>(), std::placeholders::_1));
 
-	boost::asio::io_service io_; //!< the io service
-	ThreadPool<Threading> thread_pool_;
-	signal signal_; //!< handles all kind of signals
-	netdevice<send_remote_type, received_local_type> netdevice_; //!< handles packets from virtual network device
-	gateway<GatewayProtocol, send_local_type, received_remote_type> gateway_;
+	using netdevice_type = netdevice<send_remote_type, received_local_type>;
+	using gateway_type = gateway<GatewayProtocol, send_local_type, received_remote_type>;
 
-private:
-	explicit server(server const&) = delete;
-	explicit server(server&&) = delete;
-	server const operator=(server const&) = delete;
+public:
+	using session_builder_type = typename gateway_type::session_builder_type;
+
+protected:
+	gnutls::credentials credentials_;
+	gnutls::priorities priorities_;
+
+	boost::asio::io_service io_; //!< the io service
+
+	class signal signal_; //!< handles all kind of signals
+	netdevice_type netdevice_; //!< handles packets from virtual network device
+	gateway_type gateway_;
+	session_builder_type session_builder_;
 };
 
 

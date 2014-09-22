@@ -1,18 +1,13 @@
 #ifndef encryption_h
 #define encryption_h
 
-#include <forward_list>
-#include <cstdint>
+#include <vector>
 #include <system_error>
+#include <boost/config/no_tr1/complex.hpp>
 #include <gnutls/gnutls.h>
-#include <gnutls/dtls.h>
 #include <gnutls/openpgp.h>
-#include <boost/asio/buffer.hpp>
-#include <boost/asio/high_resolution_timer.hpp>
-#include <boost/asio.hpp>
-#include <gpgme.h>
+#include <gnutls/dtls.h>
 
-#include "configuration.h++"
 
 namespace gnutls {
 
@@ -41,202 +36,117 @@ private:
 	~global();
 
 	static global* global_;
-};
 
+public:
+	static void debug(unsigned short const level);
+};
 
 namespace openpgp {
 
-class certificate;
-class privatekey;
+class certificate {
+public:
+	explicit certificate() = delete;
+	explicit certificate(certificate const&) = delete;
+	explicit certificate(std::string const&);
+	certificate(certificate&&);
+	~certificate();
+
+	certificate const& operator=(certificate const&) = delete;
+	operator gnutls_openpgp_crt_t() const;
+
+protected:
+	::gnutls_openpgp_crt_t certificate_;
+};
+
+class privatekey {
+public:
+	explicit privatekey() = delete;
+	explicit privatekey(privatekey const&) = delete;
+	explicit privatekey(std::string const&);
+	privatekey(privatekey&&);
+	~privatekey();
+
+	privatekey const& operator=(privatekey const&) = delete;
+	operator gnutls_openpgp_privkey_t() const;
+
+protected:
+	::gnutls_openpgp_privkey_t privatekey_;
+};
 
 } // namespace: openpgp
 
-
-//! wrapper around gnutls_datum_t
-class datum {
-public:
-	explicit datum();
-	explicit datum(std::string const& filename);
-	explicit datum(gnutls_datum_t const*);
-	explicit datum(std::size_t);
-	~datum();
-	operator gnutls_datum_t*();
-	gnutls_datum_t const& data() const;
-
-protected:
-	gnutls_datum_t datum_;
-	gnutls_datum_t const* const datum_p_;
-
-private:
-	explicit datum(datum&&) = delete;
-	explicit datum(datum const&) = delete;
-	datum& operator=(datum const&) = delete;
-	datum& operator=(datum&&) = delete;
-};
+class diffie_hellman_parameters;
+class session;
 
 class credentials {
 public:
-	explicit credentials();
-	explicit credentials(openpgp::certificate&, openpgp::privatekey&);
-	~credentials();
-	operator gnutls_certificate_credentials_t() const;
-	operator gnutls_priority_t() const;
-	//! set verify function
-	void verify_function(gnutls_certificate_verify_function);
-	//! verify callback function used by gntusl
-	static int verify(gnutls_session_t);
-	credentials& operator=(credentials&&);
+	friend session;
 
-protected:
-	gnutls_certificate_credentials_t credentials_; //!< credentials
-	gnutls_dh_params_t dh_params_; //!< diffie-hellmann parameter
-	gnutls_priority_t priority_; //! priorities
-
-private:
+	explicit credentials() = delete;
 	explicit credentials(credentials const&) = delete;
-	explicit credentials(credentials&&) = delete;
-	credentials& operator=(credentials const&) = delete;
+	explicit credentials(openpgp::certificate&&, openpgp::privatekey&&);
+	credentials(credentials&&);
+	~credentials();
+
+	credentials const& operator=(credentials const&) = delete;
+
+	void set(diffie_hellman_parameters const&);
+
+public:
+	::gnutls_certificate_credentials_t credentials_;
+	openpgp::certificate certificate_;
+	openpgp::privatekey privatekey_;
 };
 
-//! wrapper around gnutls's dtls cookie
-class cookie {
+class diffie_hellman_parameters {
 public:
-	cookie(std::size_t);
-	operator gnutls_dtls_prestate_st*();
+	friend credentials;
 
-	template <typename T>
-	bool verify(T& clientData, boost::asio::const_buffers_1);
-	void reset();
+	explicit diffie_hellman_parameters() = delete;
+	explicit diffie_hellman_parameters(diffie_hellman_parameters const&) = delete;
+	diffie_hellman_parameters(diffie_hellman_parameters&&);
+	explicit diffie_hellman_parameters(std::size_t const);
+	~diffie_hellman_parameters();
 
-	//! push functor used to push data
-	template <typename PushFunctor>
-	bool send(PushFunctor p, boost::asio::const_buffers_1 identification_data);
+	diffie_hellman_parameters const& operator=(diffie_hellman_parameters const&) = delete;
+	diffie_hellman_parameters& operator=(diffie_hellman_parameters&&);
 
 protected:
-	gnutls_datum_t key_;
-	gnutls_dtls_prestate_st prestate_;
+	::gnutls_dh_params_t parameters_;
 };
 
-
-namespace openpgp {
-
-//! openpgp certificate in gnutls
-class certificate {
+class priorities {
 public:
-	explicit certificate(datum const&);
-	~certificate();
-	operator gnutls_openpgp_crt_t() const;
-	//! get vector with fingerprint
-	std::vector<std::uint8_t> fingerprint() const;
-	//! set preferred subkey
-	void preferred(std::array<std::uint8_t, 8> const&);
-	//! get auth subkey
-	std::array<std::uint8_t, 8> authsubkey() const;
+	friend session;
+
+	explicit priorities() = delete;
+	explicit priorities(priorities const&) = delete;
+	priorities(priorities&&);
+	explicit priorities(std::string const&);
+	~priorities();
+
+	priorities const& operator=(priorities const&) = delete;
+	priorities const& operator=(priorities&&);
 
 protected:
-	gnutls_openpgp_crt_t certificate_;
-
-private:
-	explicit certificate() = delete;
-	explicit certificate(certificate const&) = delete;
-	explicit certificate(certificate&&) = delete;
-	certificate& operator=(certificate const&) = delete;
-	certificate& operator=(certificate&&) = delete;
+	::gnutls_priority_t priorities_;
 };
 
-//! openpgp private key in gnutls
-class privatekey {
+class session {
 public:
-	explicit privatekey(datum const&);
-	~privatekey();
-	operator gnutls_openpgp_privkey_t() const;
-	//! get vector with fingerprint
-	std::vector<std::uint8_t> fingerprint() const;
-	//! set preferred subkey
-	void preferred(std::array<std::uint8_t, 8> const&);
+	explicit session() = delete;
+	explicit session(session const&) = delete;
+	session(session&&);
+	explicit session(bool server, credentials const&, priorities const& p);
+	~session();
+
+	session const& operator=(session const&) = delete;
 
 protected:
-	gnutls_openpgp_privkey_t privatekey_;
-
-private:
-	explicit privatekey() = delete;
-	explicit privatekey(privatekey const&) = delete;
-	explicit privatekey(privatekey&&) = delete;
-	privatekey& operator=(privatekey const&) = delete;
-	privatekey& operator=(privatekey&&) = delete;
+	gnutls_session_t session_;
 };
 
-} // namespace: openpgp
 } // namespace: gnutls
-
-namespace gpgme {
-
-//! wrapper around gpgme data
-class data {
-public:
-	explicit data();
-	explicit data(char const* const, std::size_t, bool copy = false);
-	~data();
-	operator gpgme_data_t();
-	std::size_t size() const;
-
-protected:
-	gpgme_data_t data_;
-
-private:
-	explicit data(data const&) = delete;
-	explicit data(data&&) = delete;
-	data& operator=(data const&) = delete;
-	data& operator=(data&&) = delete;
-};
-
-//! openpgp key in gpgme
-class key {
-public:
-	explicit key();
-	~key();
-	operator gpgme_key_t();
-	operator gpgme_key_t*();
-
-protected:
-	gpgme_key_t key_;
-
-private:
-	explicit key(key&&) = delete;
-	explicit key(key const&) = delete;
-	key& operator=(key const&) = delete;
-	key& operator=(key&&) = delete;
-};
-
-//! gpgme context
-class context {
-public:
-	explicit context();
-	explicit context(context&&);
-	~context();
-	operator gpgme_ctx_t();
-
-	//! import key into keyring (send during handshake)
-	bool import_key(data&);
-	//! import key from key (as returned keyserver)
-	bool import_key(gpgme::key const&);
-	//! export key into data
-	bool export_key(data&, char const* const pattern) const;
-	//! get key from local keysring or query external server
-	bool key(gpgme::key&, char const* const pattern, bool external = false) const;
-	//! list all peers with vpn uids.
-	void vpn_peers(std::forward_list<std::tuple<std::string, std::set<boost::asio::ip::udp::endpoint>>>& peers);
-
-protected:
-	gpgme_ctx_t context_;
-
-private:
-	explicit context(context const&) = delete;
-	context& operator=(context const&) = delete;
-	context& operator=(context&&) = delete;
-};
-
-} // namespace: gpgme
 
 
 namespace std {

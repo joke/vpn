@@ -2,555 +2,339 @@
 #include "encryption.h++"
 #endif
 
-#include "configuration.h++"
-
-#include <array>
-#include <iostream>
-#include <sstream>
-#include <iomanip>
-#include <algorithm>
-#include <exception>
-#include <gnutls/gnutls.h>
-#include <gnutls/openpgp.h>
-#include <gnutls/dtls.h>
 #include <gpgme.h>
-#include <boost/regex.hpp>
-#include "session.h++"
-#include "convert.h++"
+#include <sstream>
+#include <iostream>
 
-// namespace gnutls {
-// 
-// enum class errc {
-// 	again = GNUTLS_E_AGAIN,
-// 	asn1_der_error = GNUTLS_E_ASN1_DER_ERROR,
-// 	asn1_der_overflow = GNUTLS_E_ASN1_DER_OVERFLOW,
-// 	asn1_element_not_found = GNUTLS_E_ASN1_ELEMENT_NOT_FOUND,
-// 	asn1_generic_error = GNUTLS_E_ASN1_GENERIC_ERROR,
-// 	asn1_identifier_not_found = GNUTLS_E_ASN1_IDENTIFIER_NOT_FOUND,
-// 	asn1_syntax_error = GNUTLS_E_ASN1_SYNTAX_ERROR,
-// 	asn1_tag_error = GNUTLS_E_ASN1_TAG_ERROR,
-// 	asn1_tag_implicit = GNUTLS_E_ASN1_TAG_IMPLICIT,
-// 	asn1_type_any_error = GNUTLS_E_ASN1_TYPE_ANY_ERROR,
-// 	asn1_value_not_found = GNUTLS_E_ASN1_VALUE_NOT_FOUND,
-// 	asn1_value_not_valid = GNUTLS_E_ASN1_VALUE_NOT_VALID,
-// 	bad_cookie = GNUTLS_E_BAD_COOKIE,
-// 	base64_decoding_error = GNUTLS_E_BASE64_DECODING_ERROR,
-// 	base64_encoding_error = GNUTLS_E_BASE64_ENCODING_ERROR,
-// 	base64_unexpected_header_error = GNUTLS_E_BASE64_UNEXPECTED_HEADER_ERROR,
-// 	certificate_error = GNUTLS_E_CERTIFICATE_ERROR,
-// 	certificate_key_mismatch = GNUTLS_E_CERTIFICATE_KEY_MISMATCH,
-// 	certificate_list_unsorted = GNUTLS_E_CERTIFICATE_LIST_UNSORTED,
-// 	channel_binding_not_available = GNUTLS_E_CHANNEL_BINDING_NOT_AVAILABLE,
-// 	compression_failed = GNUTLS_E_COMPRESSION_FAILED,
-// 	constraint_error = GNUTLS_E_CONSTRAINT_ERROR,
-// 	crypto_already_registered = GNUTLS_E_CRYPTO_ALREADY_REGISTERED,
-// 	cryptodev_device_error = GNUTLS_E_CRYPTODEV_DEVICE_ERROR,
-// 	cryptodev_ioctl_error = GNUTLS_E_CRYPTODEV_IOCTL_ERROR,
-// 	crypto_init_failed = GNUTLS_E_CRYPTO_INIT_FAILED,
-// 	db_error = GNUTLS_E_DB_ERROR,
-// 	decompression_failed = GNUTLS_E_DECOMPRESSION_FAILED,
-// 	decryption_failed = GNUTLS_E_DECRYPTION_FAILED,
-// 	dh_prime_unacceptable = GNUTLS_E_DH_PRIME_UNACCEPTABLE,
-// 	ecc_no_supported_curves = GNUTLS_E_ECC_NO_SUPPORTED_CURVES,
-// 	ecc_unsupported_curve = GNUTLS_E_ECC_UNSUPPORTED_CURVE,
-// 	encryption_failed = GNUTLS_E_ENCRYPTION_FAILED,
-// 	error_in_finished_packet = GNUTLS_E_ERROR_IN_FINISHED_PACKET,
-// 	expired = GNUTLS_E_EXPIRED,
-// 	fatal_alert_received = GNUTLS_E_FATAL_ALERT_RECEIVED,
-// 	file_error = GNUTLS_E_FILE_ERROR,
-// 	got_application_data = GNUTLS_E_GOT_APPLICATION_DATA,
-// 	handshake_too_large = GNUTLS_E_HANDSHAKE_TOO_LARGE,
-// 	hash_failed = GNUTLS_E_HASH_FAILED,
-// 	ia_verify_failed = GNUTLS_E_IA_VERIFY_FAILED,
-// 	illegal_parameter = GNUTLS_E_ILLEGAL_PARAMETER,
-// 	illegal_srp_username = GNUTLS_E_ILLEGAL_SRP_USERNAME,
-// 	incompat_dsa_key_with_tls_protocol = GNUTLS_E_INCOMPAT_DSA_KEY_WITH_TLS_PROTOCOL,
-// 	incompatible_crypto_library = GNUTLS_E_INCOMPATIBLE_CRYPTO_LIBRARY,
-// 	incompatible_gcrypt_library = GNUTLS_E_INCOMPATIBLE_GCRYPT_LIBRARY,
-// 	incompatible_libtasn1_library = GNUTLS_E_INCOMPATIBLE_LIBTASN1_LIBRARY,
-// 	insufficient_credentials = GNUTLS_E_INSUFFICIENT_CREDENTIALS,
-// 	internal_error = GNUTLS_E_INTERNAL_ERROR,
-// 	interrupted = GNUTLS_E_INTERRUPTED,
-// 	invalid_password = GNUTLS_E_INVALID_PASSWORD,
-// 	invalid_request = GNUTLS_E_INVALID_REQUEST,
-// 	invalid_session = GNUTLS_E_INVALID_SESSION,
-// 	key_usage_violation = GNUTLS_E_KEY_USAGE_VIOLATION,
-// 	large_packet = GNUTLS_E_LARGE_PACKET,
-// 	locking_error = GNUTLS_E_LOCKING_ERROR,
-// 	mac_verify_failed = GNUTLS_E_MAC_VERIFY_FAILED,
-// 	memory_error = GNUTLS_E_MEMORY_ERROR,
-// 	mpi_print_failed = GNUTLS_E_MPI_PRINT_FAILED,
-// 	mpi_scan_failed = GNUTLS_E_MPI_SCAN_FAILED,
-// 	no_certificate_found = GNUTLS_E_NO_CERTIFICATE_FOUND,
-// 	no_cipher_suites = GNUTLS_E_NO_CIPHER_SUITES,
-// 	no_compression_algorithms = GNUTLS_E_NO_COMPRESSION_ALGORITHMS,
-// 	no_priorities_were_set = GNUTLS_E_NO_PRIORITIES_WERE_SET,
-// 	no_temporary_dh_params = GNUTLS_E_NO_TEMPORARY_DH_PARAMS,
-// 	no_temporary_rsa_params = GNUTLS_E_NO_TEMPORARY_RSA_PARAMS,
-// 	openpgp_fingerprint_unsupported = GNUTLS_E_OPENPGP_FINGERPRINT_UNSUPPORTED,
-// 	openpgp_getkey_failed = GNUTLS_E_OPENPGP_GETKEY_FAILED,
-// 	openpgp_keyring_error = GNUTLS_E_OPENPGP_KEYRING_ERROR,
-// 	openpgp_preferred_key_error = GNUTLS_E_OPENPGP_PREFERRED_KEY_ERROR,
-// 	openpgp_subkey_error = GNUTLS_E_OPENPGP_SUBKEY_ERROR,
-// 	openpgp_uid_revoked = GNUTLS_E_OPENPGP_UID_REVOKED,
-// 	parsing_error = GNUTLS_E_PARSING_ERROR,
-// 	pkcs11_attribute_error = GNUTLS_E_PKCS11_ATTRIBUTE_ERROR,
-// 	pkcs11_data_error = GNUTLS_E_PKCS11_DATA_ERROR,
-// 	pkcs11_device_error = GNUTLS_E_PKCS11_DEVICE_ERROR,
-// 	pkcs11_error = GNUTLS_E_PKCS11_ERROR,
-// 	pkcs11_key_error = GNUTLS_E_PKCS11_KEY_ERROR,
-// 	pkcs11_load_error = GNUTLS_E_PKCS11_LOAD_ERROR,
-// 	pkcs11_pin_error = GNUTLS_E_PKCS11_PIN_ERROR,
-// 	pkcs11_pin_expired = GNUTLS_E_PKCS11_PIN_EXPIRED,
-// 	pkcs11_pin_locked = GNUTLS_E_PKCS11_PIN_LOCKED,
-// 	pkcs11_requested_object_not_availble = GNUTLS_E_PKCS11_REQUESTED_OBJECT_NOT_AVAILBLE,
-// 	pkcs11_session_error = GNUTLS_E_PKCS11_SESSION_ERROR,
-// 	pkcs11_signature_error = GNUTLS_E_PKCS11_SIGNATURE_ERROR,
-// 	pkcs11_slot_error = GNUTLS_E_PKCS11_SLOT_ERROR,
-// 	pkcs11_token_error = GNUTLS_E_PKCS11_TOKEN_ERROR,
-// 	pkcs11_unsupported_feature_error = GNUTLS_E_PKCS11_UNSUPPORTED_FEATURE_ERROR,
-// 	pkcs11_user_error = GNUTLS_E_PKCS11_USER_ERROR,
-// 	pkcs1_wrong_pad = GNUTLS_E_PKCS1_WRONG_PAD,
-// 	pk_decryption_failed = GNUTLS_E_PK_DECRYPTION_FAILED,
-// 	pk_encryption_failed = GNUTLS_E_PK_ENCRYPTION_FAILED,
-// 	pk_sign_failed = GNUTLS_E_PK_SIGN_FAILED,
-// 	pk_sig_verify_failed = GNUTLS_E_PK_SIG_VERIFY_FAILED,
-// 	premature_termination = GNUTLS_E_PREMATURE_TERMINATION,
-// 	pull_error = GNUTLS_E_PULL_ERROR,
-// 	push_error = GNUTLS_E_PUSH_ERROR,
-// 	random_failed = GNUTLS_E_RANDOM_FAILED,
-// 	received_illegal_extension = GNUTLS_E_RECEIVED_ILLEGAL_EXTENSION,
-// 	received_illegal_parameter = GNUTLS_E_RECEIVED_ILLEGAL_PARAMETER,
-// 	record_limit_reached = GNUTLS_E_RECORD_LIMIT_REACHED,
-// 	rehandshake = GNUTLS_E_REHANDSHAKE,
-// 	requested_data_not_available = GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE,
-// 	safe_renegotiation_failed = GNUTLS_E_SAFE_RENEGOTIATION_FAILED,
-// 	session_eof = GNUTLS_E_SESSION_EOF,
-// 	short_memory_buffer = GNUTLS_E_SHORT_MEMORY_BUFFER,
-// 	srp_pwd_error = GNUTLS_E_SRP_PWD_ERROR,
-// 	srp_pwd_parsing_error = GNUTLS_E_SRP_PWD_PARSING_ERROR,
-// 	timedout = GNUTLS_E_TIMEDOUT,
-// 	too_many_empty_packets = GNUTLS_E_TOO_MANY_EMPTY_PACKETS,
-// 	too_many_handshake_packets = GNUTLS_E_TOO_MANY_HANDSHAKE_PACKETS,
-// 	tpm_error = GNUTLS_E_TPM_ERROR,
-// 	tpm_key_not_found = GNUTLS_E_TPM_KEY_NOT_FOUND,
-// 	tpm_key_password_error = GNUTLS_E_TPM_KEY_PASSWORD_ERROR,
-// 	tpm_session_error = GNUTLS_E_TPM_SESSION_ERROR,
-// 	tpm_srk_password_error = GNUTLS_E_TPM_SRK_PASSWORD_ERROR,
-// 	tpm_uninitialized = GNUTLS_E_TPM_UNINITIALIZED,
-// 	unexpected_handshake_packet = GNUTLS_E_UNEXPECTED_HANDSHAKE_PACKET,
-// 	unexpected_packet = GNUTLS_E_UNEXPECTED_PACKET,
-// 	unexpected_packet_length = GNUTLS_E_UNEXPECTED_PACKET_LENGTH,
-// 	unimplemented_feature = GNUTLS_E_UNIMPLEMENTED_FEATURE,
-// 	unknown_algorithm = GNUTLS_E_UNKNOWN_ALGORITHM,
-// 	unknown_cipher_suite = GNUTLS_E_UNKNOWN_CIPHER_SUITE,
-// 	unknown_cipher_type = GNUTLS_E_UNKNOWN_CIPHER_TYPE,
-// 	unknown_compression_algorithm = GNUTLS_E_UNKNOWN_COMPRESSION_ALGORITHM,
-// 	unknown_hash_algorithm = GNUTLS_E_UNKNOWN_HASH_ALGORITHM,
-// 	unknown_pk_algorithm = GNUTLS_E_UNKNOWN_PK_ALGORITHM,
-// 	unknown_pkcs_bag_type = GNUTLS_E_UNKNOWN_PKCS_BAG_TYPE,
-// 	unknown_pkcs_content_type = GNUTLS_E_UNKNOWN_PKCS_CONTENT_TYPE,
-// 	unknown_srp_username = GNUTLS_E_UNKNOWN_SRP_USERNAME,
-// 	unsafe_renegotiation_denied = GNUTLS_E_UNSAFE_RENEGOTIATION_DENIED,
-// 	unsupported_certificate_type = GNUTLS_E_UNSUPPORTED_CERTIFICATE_TYPE,
-// 	unsupported_signature_algorithm = GNUTLS_E_UNSUPPORTED_SIGNATURE_ALGORITHM,
-// 	unsupported_version_packet = GNUTLS_E_UNSUPPORTED_VERSION_PACKET,
-// 	unwanted_algorithm = GNUTLS_E_UNWANTED_ALGORITHM,
-// 	user_error = GNUTLS_E_USER_ERROR,
-// 	warning_alert_received = GNUTLS_E_WARNING_ALERT_RECEIVED,
-// 	warning_ia_fphf_received = GNUTLS_E_WARNING_IA_FPHF_RECEIVED,
-// 	warning_ia_iphf_received = GNUTLS_E_WARNING_IA_IPHF_RECEIVED,
-// 	x509_unknown_san = GNUTLS_E_X509_UNKNOWN_SAN,
-// 	x509_unsupported_attribute = GNUTLS_E_X509_UNSUPPORTED_ATTRIBUTE,
-// 	x509_unsupported_critical_extension = GNUTLS_E_X509_UNSUPPORTED_CRITICAL_EXTENSION,
-// 	x509_unsupported_extension = GNUTLS_E_X509_UNSUPPORTED_EXTENSION,
-// 	x509_unsupported_oid = GNUTLS_E_X509_UNSUPPORTED_OID
-// };
-//
-// //! wrapper around gnutls error codes
-// template <typename T>
-// inline T wrap_error(T t) {
-// 	if (::gnutls_error_is_fatal(t) > 0)
-// 		throw std::error_code(static_cast<int>(t), gnutls_category());
-// 	return t;
-// }
-//
-// //! wrapper which doesn't throw
-// template <typename T>
-// inline void wrap_error(T t, std::error_code& e) {
-// 	e.assign(static_cast<int>(t), gnutls_category());
-// }
-//
-// inline const char* error_category::name() const noexcept {
-// 	return "gnutls";
-// }
-//
-// inline std::string error_category::message(int const error) const noexcept {
-// 	return std::string(::gnutls_strerror(error));
-// }
-//
-// inline error_category const& error_category::instance() {
-// 	static error_category ec;
-// 	return ec;
-// }
-//
-// inline std::error_category const& gnutls_category() noexcept {
-// 	return error_category::instance();
-// }
-//
-// inline global::global() {
-// 	// check correct linkage
-// 	if (!::gnutls_check_version("3.1.9"))
-// 		throw std::runtime_error("wrong gnutls version");
-// 	wrap_error(::gnutls_global_init());
-// 	if (!::gpgme_check_version("1.2.0"))
-// 		throw std::runtime_error("wrong gpgme version");
-// 	if (::gpgme_engine_check_version(GPGME_PROTOCOL_OpenPGP) != GPG_ERR_NO_ERROR)
-// 		throw std::runtime_error("gpgme doesn't support OpenPGP protocol");
-// }
-//
-// inline global::~global() {
-// 	::gnutls_global_deinit();
-// 	delete this->global_;
-// }
-//
-// global* global::global_(new global());
-//
-//
-// inline datum::datum() : datum_(), datum_p_(nullptr) {
-// }
-//
-// inline datum::datum(std::string const& filename) : datum_(), datum_p_(nullptr) {
-// 	wrap_error(::gnutls_load_file(filename.data(), &datum_));
-// }
-//
-// inline datum::datum(gnutls_datum_t const* d) : datum_(), datum_p_(d) {
-// }
-//
-// inline datum::datum(std::size_t s) : datum_(), datum_p_(nullptr) {
-// 	datum_.size = s;
-// 	datum_.data = static_cast<unsigned char*>(::gnutls_malloc(s));
-// }
-//
-// inline datum::~datum() {
-// // 	if (datum_.data)
-// // 		::gnutls_free(static_cast<void*>(datum_.data));
-// }
-//
-// inline datum::operator gnutls_datum_t*() {
-// 	if (datum_p_)
-// 		return const_cast<gnutls_datum_t*>(datum_p_);
-// 	return &datum_;
-// }
-//
-// inline gnutls_datum_t const& datum::data() const {
-// 	return datum_;
-// }
-//
-//
-// inline credentials::~credentials() {
-// 	if (credentials_)
-// 		::gnutls_certificate_free_credentials(credentials_);
-// 	if (dh_params_)
-// 		::gnutls_dh_params_deinit(dh_params_);
-// 	if (priority_)
-// 		::gnutls_priority_deinit(priority_);
-// }
-//
-// inline credentials::operator gnutls_certificate_credentials_t() const {
-// 	return credentials_;
-// }
-//
-// inline credentials::operator gnutls_priority_t() const {
-// 	return priority_;
-// }
-//
-// inline credentials::credentials() : credentials_(nullptr), dh_params_(nullptr), priority_(nullptr) {
-// }
-//
-// inline credentials::credentials(openpgp::certificate& c, openpgp::privatekey& p) : credentials_(nullptr), dh_params_(nullptr), priority_(nullptr) {
-// 	wrap_error(::gnutls_certificate_allocate_credentials(&credentials_));
-//
-// 	auto subkey(cfg::configuration["subkey"].as<std::string>());
-// 	if (subkey == "auto") {
-// 		// get perferred key and set it
-// 		auto keyid(c.authsubkey());
-//
-// 		c.preferred(keyid);
-// 		p.preferred(keyid);
-// 	} else {
-// 		// just set preferred key
-// 		std::array<std::uint8_t, 8> keyid;
-// 		std::size_t s;
-// 		wrap_error(::gnutls_hex2bin(subkey.data(), 16, keyid.data(), &s));
-// 		c.preferred(keyid);
-// 		p.preferred(keyid);
-// 	}
-//
-// 	gnutls_openpgp_keyid_t keyid;
-// 	wrap_error(::gnutls_openpgp_crt_get_preferred_key_id(c, keyid));
-// 	wrap_error(::gnutls_openpgp_privkey_get_preferred_key_id(p, keyid));
-//
-// 	wrap_error(::gnutls_certificate_set_openpgp_key(credentials_, c, p));
-// 	wrap_error(::gnutls_priority_init(&priority_, cfg::configuration["priorities"].as<std::string>().data(), nullptr));
-// 	wrap_error(::gnutls_dh_params_init(&this->dh_params_));
-// 	wrap_error(::gnutls_dh_params_generate2(this->dh_params_, cfg::configuration["dh"].as<std::size_t>()));
-// 	::gnutls_certificate_set_dh_params(credentials_, dh_params_);
-// }
-//
-// inline credentials& credentials::operator=(credentials&& c) {
-// 	credentials_ = c.credentials_;
-// 	dh_params_ = c.dh_params_;
-// 	priority_ = c.priority_;
-// 	c.credentials_ = nullptr;
-// 	c.dh_params_ = nullptr;
-// 	c.priority_ = nullptr;
-// 	return *this;
-// }
-//
-// inline void credentials::verify_function(gnutls_certificate_verify_function f) {
-// 	::gnutls_certificate_set_verify_function(credentials_, f);
-// }
-//
-// inline cookie::cookie(std::size_t s = cfg::configuration["dh"].as<std::size_t>()) : key_(), prestate_() {
-// 	wrap_error(::gnutls_key_generate(&key_, s));
-// }
-//
-// inline cookie::operator gnutls_dtls_prestate_st*() {
-// 	return &prestate_;
-// }
-//
-// inline void cookie::reset() {
-// 	prestate_ = decltype(prestate_)();
-// }
-//
-// template <typename T>
-// inline bool cookie::verify(T& clientData, boost::asio::const_buffers_1 b) {
-// 	// verify cookie
-// 	std::error_code e;
-// 	wrap_error(::gnutls_dtls_cookie_verify(&key_, const_cast<void*>(static_cast<const void*>(&clientData)), sizeof(clientData),  const_cast<void*>(boost::asio::buffer_cast<const void*>(b)), boost::asio::buffer_size(b), &prestate_), e);
-//
-// 	return (e.value() == 0) ? true : false;
-// }
-//
-// template <typename PushFunctor>
-// bool cookie::send(PushFunctor p, boost::asio::const_buffers_1 identification_data) {
-// 	// send cookie using push functor
-// 	using namespace boost::asio;
-//
-// 	::gnutls_dtls_cookie_send(&key_, const_cast<void*>(buffer_cast<const void*>(identification_data)), buffer_size(identification_data), &prestate_, &p, [](gnutls_transport_ptr_t t, const void* b, size_t s) -> std::ptrdiff_t {
-// 		return (*static_cast<PushFunctor*>(t))(boost::asio::buffer(b, s));
-// 	});
-// }
-//
-//
-// namespace openpgp {
-//
-// inline certificate::certificate(datum const& d) : certificate_() {
-// 	// TODO return val
-// 	::gnutls_openpgp_crt_init(&certificate_);
-// 	::gnutls_openpgp_crt_import(certificate_, *const_cast<datum*>(&d), GNUTLS_OPENPGP_FMT_RAW);
-// }
-//
-// inline certificate::~certificate() {
-// 	if (certificate_)
-// 		gnutls_openpgp_crt_deinit(certificate_);
-// }
-//
-// inline certificate::operator gnutls_openpgp_crt_t() const {
-// 	return certificate_;
-// }
-//
-// inline std::vector<std::uint8_t> certificate::fingerprint() const {
-// 	using namespace std;
-//
-// 	size_t length(20);
-// 	vector<uint8_t> fp(length);
-// 	// TODO return value
-// 	::gnutls_openpgp_crt_get_fingerprint(certificate_, fp.data(), &length);
-// 	fp.resize(length);
-// 	return fp;
-// }
-//
-// inline void certificate::preferred(std::array<std::uint8_t, 8> const& keyid) {
-// 	wrap_error(::gnutls_openpgp_crt_set_preferred_key_id(certificate_, keyid.data()));
-// }
-//
-// inline std::array<std::uint8_t, 8> certificate::authsubkey() const {
-// 	std::array<std::uint8_t, 8> keyid;
-// 	wrap_error(::gnutls_openpgp_crt_get_auth_subkey(certificate_, keyid.data(), 0));
-// 	return keyid;
-// }
-//
-//
-// inline privatekey::privatekey(datum const& d) : privatekey_() {
-// 	// TODO return val
-// 	::gnutls_openpgp_privkey_init(&privatekey_);
-// 	::gnutls_openpgp_privkey_import(privatekey_, *const_cast<datum*>(&d), GNUTLS_OPENPGP_FMT_RAW, nullptr, 0);
-// }
-//
-// inline privatekey::~privatekey() {
-// 		if (privatekey_)
-// 			gnutls_openpgp_privkey_deinit(privatekey_);
-// }
-//
-// inline privatekey::operator gnutls_openpgp_privkey_t() const {
-// 	return privatekey_;
-// }
-//
-// inline std::vector<std::uint8_t> privatekey::fingerprint() const {
-// 	using namespace std;
-//
-// 	size_t length(20);
-// 	vector<uint8_t> fp(length);
-// 	// TODO return value
-// 	::gnutls_openpgp_privkey_get_fingerprint(privatekey_, fp.data(), &length);
-// 	fp.resize(length);
-// 	return fp;
-// }
-//
-// inline void privatekey::preferred(std::array<std::uint8_t, 8> const& keyid) {
-// 	wrap_error(::gnutls_openpgp_privkey_set_preferred_key_id(privatekey_, keyid.data()));
-// }
-//
-// } // namespace: openpgp
-// } // namespace: gnutls
-//
-// namespace gpgme {
-//
-// inline data::data() : data_() {
-// 	::gpgme_data_new(&data_);
-// }
-//
-// inline data::data(char const* const d, std::size_t s, bool copy) : data_() {
-// 	::gpgme_data_new(&data_);
-// 	// TODO return value
-// 	::gpgme_data_new_from_mem(&data_, d, s, copy);
-// }
-//
-// inline data::~data() {
-// // 	if (data_)
-// // 		::gpgme_data_release(data_);
-// }
-//
-// inline data::operator gpgme_data_t() {
-// 	return data_;
-// }
-//
-// inline 	std::size_t data::size() const {
-// 	// TODO return value
-// 	auto size(::gpgme_data_seek(data_, 0, SEEK_END));
-// 	::gpgme_data_seek(data_, 0, SEEK_SET);
-// 	return size;
-// }
-//
-//
-// inline key::key() : key_(nullptr) {
-// }
-//
-// inline key::~key() {
-// 	if (key_)
-// 		::gpgme_key_unref(key_);
-// }
-//
-// inline key::operator gpgme_key_t() {
-// 	return key_;
-// }
-//
-// inline key::operator gpgme_key_t*() {
-// 	return &key_;
-// }
-//
-// inline context::context() : context_(nullptr) {
-// 	::gpgme_new(&context_);
-// 	::gpgme_set_protocol(context_, GPGME_PROTOCOL_OpenPGP);
-// }
-//
-// inline context::context(context&& c) : context_(c.context_) {
-// 	c.context_ = nullptr;
-// }
-//
-// inline context::~context() {
-// 	if (context_)
-// 		::gpgme_release(context_);
-// }
-//
-// inline bool context::export_key(data& d, char const* const pattern) const {
-// 	return (::gpgme_op_export(context_, pattern, 0, d) == GPG_ERR_NO_ERROR);
-// }
-//
-// inline bool context::import_key(gpgme::key const& k) {
-// 	gpgme_key_t keys[2] { *const_cast<gpgme::key*>(&k), nullptr };
-// 	return (::gpgme_op_import_keys(context_, keys) == GPG_ERR_NO_ERROR);
-// }
-//
-// inline bool context::import_key(data& d) {
-// 	return (::gpgme_op_import(context_, d) == GPG_ERR_NO_ERROR);
-// }
-//
-// inline bool context::key(gpgme::key& k, char const* const fpr, bool external) const {
-// 	// TODO return value
-// 	::gpgme_set_keylist_mode(context_, (external) ? GPGME_KEYLIST_MODE_EXTERN : GPGME_KEYLIST_MODE_LOCAL);
-// 	// FIXME: error return value
-// 	return (::gpgme_get_key(context_, fpr, k, 0) == GPG_ERR_NO_ERROR);
-// }
-//
-// inline void context::vpn_peers(std::forward_list<std::tuple<std::string, std::set<boost::asio::ip::udp::endpoint>>>& peers) {
-// 	using namespace std;
-// 	using namespace boost;
-// 	using namespace boost::asio;
-// 	using namespace boost::asio::ip;
-//
-// 	auto validity(cfg::configuration["validity"].as<uint8_t>());
-// 	gpgme_error_t err(::gpgme_op_keylist_start(context_, nullptr, 0));
-// 	regex regex( R"(vpn://(\[([^\]]+)\]|([^:]+))(:(\d+))?)");
-//
-// 	io_service io;
-// 	udp::resolver resolver(io);
-//
-//
-// 	// get a list of all known keys from gpgme
-// 	while (true) {
-// 		gpgme::key key;
-// 		if (::gpgme_op_keylist_next(context_, key))
-// 			break;
-// 		gpgme_key_t mainkey(key);
-// 		auto firstkey(mainkey->subkeys);
-// 		if (!mainkey->disabled && !mainkey->expired && !mainkey->invalid && !firstkey->disabled && !firstkey->expired && !firstkey->invalid) {
-// 			set<ip::udp::endpoint> endpoints;
-//
-// 			// check if uid matches key criterion
-// 			for (auto uid = mainkey->uids; uid; uid = uid->next)
-// 				if (!uid->revoked && !uid->invalid && uid->validity >= validity) {
-// 					smatch matches;
-// 					if (regex_match(string(uid->email), matches, regex))
-// 						try {
-// 							ip::udp::endpoint endpoint;
-// 							udp::resolver::query q(
-// 								udp::v6(),
-// 								(!matches[2].str().empty()) ? matches[2].str() : matches[3].str(),
-// 								(!matches[5].str().empty()) ? matches[5].str() : "45678",
-// 								udp::resolver::query::flags::v4_mapped
-// 							);
-// 							// if it matches resolve endpoint
-// 							for (auto it(resolver.resolve(q)); it != udp::resolver::iterator(); ++it)
-// 								endpoints.insert(*it);
-// 						} catch (...) {
-// 						}
-// 				}
-// 			if (!endpoints.empty())
-// 				peers.push_front(make_tuple(string(firstkey->fpr), move(endpoints)));
-// 		}
-// 	}
-// }
-//
-// } // namespace: gpgme
-//
-//
-// namespace std {
-//
-// inline error_code make_error_code(gnutls::errc e) {
-// 	return error_code(static_cast<int>(e), gnutls::gnutls_category());
-// }
+namespace gnutls {
 
-// } // namespace: std
+enum class errc {
+	again = GNUTLS_E_AGAIN,
+	asn1_der_error = GNUTLS_E_ASN1_DER_ERROR,
+	asn1_der_overflow = GNUTLS_E_ASN1_DER_OVERFLOW,
+	asn1_element_not_found = GNUTLS_E_ASN1_ELEMENT_NOT_FOUND,
+	asn1_generic_error = GNUTLS_E_ASN1_GENERIC_ERROR,
+	asn1_identifier_not_found = GNUTLS_E_ASN1_IDENTIFIER_NOT_FOUND,
+	asn1_syntax_error = GNUTLS_E_ASN1_SYNTAX_ERROR,
+	asn1_tag_error = GNUTLS_E_ASN1_TAG_ERROR,
+	asn1_tag_implicit = GNUTLS_E_ASN1_TAG_IMPLICIT,
+	asn1_type_any_error = GNUTLS_E_ASN1_TYPE_ANY_ERROR,
+	asn1_value_not_found = GNUTLS_E_ASN1_VALUE_NOT_FOUND,
+	asn1_value_not_valid = GNUTLS_E_ASN1_VALUE_NOT_VALID,
+	bad_cookie = GNUTLS_E_BAD_COOKIE,
+	base64_decoding_error = GNUTLS_E_BASE64_DECODING_ERROR,
+	base64_encoding_error = GNUTLS_E_BASE64_ENCODING_ERROR,
+	base64_unexpected_header_error = GNUTLS_E_BASE64_UNEXPECTED_HEADER_ERROR,
+	certificate_error = GNUTLS_E_CERTIFICATE_ERROR,
+	certificate_key_mismatch = GNUTLS_E_CERTIFICATE_KEY_MISMATCH,
+	certificate_list_unsorted = GNUTLS_E_CERTIFICATE_LIST_UNSORTED,
+	channel_binding_not_available = GNUTLS_E_CHANNEL_BINDING_NOT_AVAILABLE,
+	compression_failed = GNUTLS_E_COMPRESSION_FAILED,
+	constraint_error = GNUTLS_E_CONSTRAINT_ERROR,
+	crypto_already_registered = GNUTLS_E_CRYPTO_ALREADY_REGISTERED,
+	cryptodev_device_error = GNUTLS_E_CRYPTODEV_DEVICE_ERROR,
+	cryptodev_ioctl_error = GNUTLS_E_CRYPTODEV_IOCTL_ERROR,
+	crypto_init_failed = GNUTLS_E_CRYPTO_INIT_FAILED,
+	db_error = GNUTLS_E_DB_ERROR,
+	decompression_failed = GNUTLS_E_DECOMPRESSION_FAILED,
+	decryption_failed = GNUTLS_E_DECRYPTION_FAILED,
+	dh_prime_unacceptable = GNUTLS_E_DH_PRIME_UNACCEPTABLE,
+	ecc_no_supported_curves = GNUTLS_E_ECC_NO_SUPPORTED_CURVES,
+	ecc_unsupported_curve = GNUTLS_E_ECC_UNSUPPORTED_CURVE,
+	encryption_failed = GNUTLS_E_ENCRYPTION_FAILED,
+	error_in_finished_packet = GNUTLS_E_ERROR_IN_FINISHED_PACKET,
+	expired = GNUTLS_E_EXPIRED,
+	fatal_alert_received = GNUTLS_E_FATAL_ALERT_RECEIVED,
+	file_error = GNUTLS_E_FILE_ERROR,
+	got_application_data = GNUTLS_E_GOT_APPLICATION_DATA,
+	handshake_too_large = GNUTLS_E_HANDSHAKE_TOO_LARGE,
+	hash_failed = GNUTLS_E_HASH_FAILED,
+	ia_verify_failed = GNUTLS_E_IA_VERIFY_FAILED,
+	illegal_parameter = GNUTLS_E_ILLEGAL_PARAMETER,
+	illegal_srp_username = GNUTLS_E_ILLEGAL_SRP_USERNAME,
+	incompat_dsa_key_with_tls_protocol = GNUTLS_E_INCOMPAT_DSA_KEY_WITH_TLS_PROTOCOL,
+	incompatible_crypto_library = GNUTLS_E_INCOMPATIBLE_CRYPTO_LIBRARY,
+	incompatible_gcrypt_library = GNUTLS_E_INCOMPATIBLE_GCRYPT_LIBRARY,
+	incompatible_libtasn1_library = GNUTLS_E_INCOMPATIBLE_LIBTASN1_LIBRARY,
+	insufficient_credentials = GNUTLS_E_INSUFFICIENT_CREDENTIALS,
+	internal_error = GNUTLS_E_INTERNAL_ERROR,
+	interrupted = GNUTLS_E_INTERRUPTED,
+	invalid_password = GNUTLS_E_INVALID_PASSWORD,
+	invalid_request = GNUTLS_E_INVALID_REQUEST,
+	invalid_session = GNUTLS_E_INVALID_SESSION,
+	key_usage_violation = GNUTLS_E_KEY_USAGE_VIOLATION,
+	large_packet = GNUTLS_E_LARGE_PACKET,
+	locking_error = GNUTLS_E_LOCKING_ERROR,
+	mac_verify_failed = GNUTLS_E_MAC_VERIFY_FAILED,
+	memory_error = GNUTLS_E_MEMORY_ERROR,
+	mpi_print_failed = GNUTLS_E_MPI_PRINT_FAILED,
+	mpi_scan_failed = GNUTLS_E_MPI_SCAN_FAILED,
+	no_certificate_found = GNUTLS_E_NO_CERTIFICATE_FOUND,
+	no_cipher_suites = GNUTLS_E_NO_CIPHER_SUITES,
+	no_compression_algorithms = GNUTLS_E_NO_COMPRESSION_ALGORITHMS,
+	no_priorities_were_set = GNUTLS_E_NO_PRIORITIES_WERE_SET,
+	no_temporary_dh_params = GNUTLS_E_NO_TEMPORARY_DH_PARAMS,
+	no_temporary_rsa_params = GNUTLS_E_NO_TEMPORARY_RSA_PARAMS,
+	openpgp_fingerprint_unsupported = GNUTLS_E_OPENPGP_FINGERPRINT_UNSUPPORTED,
+	openpgp_getkey_failed = GNUTLS_E_OPENPGP_GETKEY_FAILED,
+	openpgp_keyring_error = GNUTLS_E_OPENPGP_KEYRING_ERROR,
+	openpgp_preferred_key_error = GNUTLS_E_OPENPGP_PREFERRED_KEY_ERROR,
+	openpgp_subkey_error = GNUTLS_E_OPENPGP_SUBKEY_ERROR,
+	openpgp_uid_revoked = GNUTLS_E_OPENPGP_UID_REVOKED,
+	parsing_error = GNUTLS_E_PARSING_ERROR,
+	pkcs11_attribute_error = GNUTLS_E_PKCS11_ATTRIBUTE_ERROR,
+	pkcs11_data_error = GNUTLS_E_PKCS11_DATA_ERROR,
+	pkcs11_device_error = GNUTLS_E_PKCS11_DEVICE_ERROR,
+	pkcs11_error = GNUTLS_E_PKCS11_ERROR,
+	pkcs11_key_error = GNUTLS_E_PKCS11_KEY_ERROR,
+	pkcs11_load_error = GNUTLS_E_PKCS11_LOAD_ERROR,
+	pkcs11_pin_error = GNUTLS_E_PKCS11_PIN_ERROR,
+	pkcs11_pin_expired = GNUTLS_E_PKCS11_PIN_EXPIRED,
+	pkcs11_pin_locked = GNUTLS_E_PKCS11_PIN_LOCKED,
+	pkcs11_requested_object_not_availble = GNUTLS_E_PKCS11_REQUESTED_OBJECT_NOT_AVAILBLE,
+	pkcs11_session_error = GNUTLS_E_PKCS11_SESSION_ERROR,
+	pkcs11_signature_error = GNUTLS_E_PKCS11_SIGNATURE_ERROR,
+	pkcs11_slot_error = GNUTLS_E_PKCS11_SLOT_ERROR,
+	pkcs11_token_error = GNUTLS_E_PKCS11_TOKEN_ERROR,
+	pkcs11_unsupported_feature_error = GNUTLS_E_PKCS11_UNSUPPORTED_FEATURE_ERROR,
+	pkcs11_user_error = GNUTLS_E_PKCS11_USER_ERROR,
+	pkcs1_wrong_pad = GNUTLS_E_PKCS1_WRONG_PAD,
+	pk_decryption_failed = GNUTLS_E_PK_DECRYPTION_FAILED,
+	pk_encryption_failed = GNUTLS_E_PK_ENCRYPTION_FAILED,
+	pk_sign_failed = GNUTLS_E_PK_SIGN_FAILED,
+	pk_sig_verify_failed = GNUTLS_E_PK_SIG_VERIFY_FAILED,
+	premature_termination = GNUTLS_E_PREMATURE_TERMINATION,
+	pull_error = GNUTLS_E_PULL_ERROR,
+	push_error = GNUTLS_E_PUSH_ERROR,
+	random_failed = GNUTLS_E_RANDOM_FAILED,
+	received_illegal_extension = GNUTLS_E_RECEIVED_ILLEGAL_EXTENSION,
+	received_illegal_parameter = GNUTLS_E_RECEIVED_ILLEGAL_PARAMETER,
+	record_limit_reached = GNUTLS_E_RECORD_LIMIT_REACHED,
+	rehandshake = GNUTLS_E_REHANDSHAKE,
+	requested_data_not_available = GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE,
+	safe_renegotiation_failed = GNUTLS_E_SAFE_RENEGOTIATION_FAILED,
+	session_eof = GNUTLS_E_SESSION_EOF,
+	short_memory_buffer = GNUTLS_E_SHORT_MEMORY_BUFFER,
+	srp_pwd_error = GNUTLS_E_SRP_PWD_ERROR,
+	srp_pwd_parsing_error = GNUTLS_E_SRP_PWD_PARSING_ERROR,
+	timedout = GNUTLS_E_TIMEDOUT,
+	too_many_empty_packets = GNUTLS_E_TOO_MANY_EMPTY_PACKETS,
+	too_many_handshake_packets = GNUTLS_E_TOO_MANY_HANDSHAKE_PACKETS,
+	tpm_error = GNUTLS_E_TPM_ERROR,
+	tpm_key_not_found = GNUTLS_E_TPM_KEY_NOT_FOUND,
+	tpm_key_password_error = GNUTLS_E_TPM_KEY_PASSWORD_ERROR,
+	tpm_session_error = GNUTLS_E_TPM_SESSION_ERROR,
+	tpm_srk_password_error = GNUTLS_E_TPM_SRK_PASSWORD_ERROR,
+	tpm_uninitialized = GNUTLS_E_TPM_UNINITIALIZED,
+	unexpected_handshake_packet = GNUTLS_E_UNEXPECTED_HANDSHAKE_PACKET,
+	unexpected_packet = GNUTLS_E_UNEXPECTED_PACKET,
+	unexpected_packet_length = GNUTLS_E_UNEXPECTED_PACKET_LENGTH,
+	unimplemented_feature = GNUTLS_E_UNIMPLEMENTED_FEATURE,
+	unknown_algorithm = GNUTLS_E_UNKNOWN_ALGORITHM,
+	unknown_cipher_suite = GNUTLS_E_UNKNOWN_CIPHER_SUITE,
+	unknown_cipher_type = GNUTLS_E_UNKNOWN_CIPHER_TYPE,
+	unknown_compression_algorithm = GNUTLS_E_UNKNOWN_COMPRESSION_ALGORITHM,
+	unknown_hash_algorithm = GNUTLS_E_UNKNOWN_HASH_ALGORITHM,
+	unknown_pk_algorithm = GNUTLS_E_UNKNOWN_PK_ALGORITHM,
+	unknown_pkcs_bag_type = GNUTLS_E_UNKNOWN_PKCS_BAG_TYPE,
+	unknown_pkcs_content_type = GNUTLS_E_UNKNOWN_PKCS_CONTENT_TYPE,
+	unknown_srp_username = GNUTLS_E_UNKNOWN_SRP_USERNAME,
+	unsafe_renegotiation_denied = GNUTLS_E_UNSAFE_RENEGOTIATION_DENIED,
+	unsupported_certificate_type = GNUTLS_E_UNSUPPORTED_CERTIFICATE_TYPE,
+	unsupported_signature_algorithm = GNUTLS_E_UNSUPPORTED_SIGNATURE_ALGORITHM,
+	unsupported_version_packet = GNUTLS_E_UNSUPPORTED_VERSION_PACKET,
+	unwanted_algorithm = GNUTLS_E_UNWANTED_ALGORITHM,
+	user_error = GNUTLS_E_USER_ERROR,
+	warning_alert_received = GNUTLS_E_WARNING_ALERT_RECEIVED,
+	warning_ia_fphf_received = GNUTLS_E_WARNING_IA_FPHF_RECEIVED,
+	warning_ia_iphf_received = GNUTLS_E_WARNING_IA_IPHF_RECEIVED,
+	x509_unknown_san = GNUTLS_E_X509_UNKNOWN_SAN,
+	x509_unsupported_attribute = GNUTLS_E_X509_UNSUPPORTED_ATTRIBUTE,
+	x509_unsupported_critical_extension = GNUTLS_E_X509_UNSUPPORTED_CRITICAL_EXTENSION,
+	x509_unsupported_extension = GNUTLS_E_X509_UNSUPPORTED_EXTENSION,
+	x509_unsupported_oid = GNUTLS_E_X509_UNSUPPORTED_OID
+};
+
+//! wrapper around gnutls error codes
+template <typename T>
+inline T wrap_error(T t) {
+	if (::gnutls_error_is_fatal(t) > 0)
+		throw std::error_code(static_cast<int>(t), gnutls_category());
+	return t;
+}
+
+//! wrapper which doesn't throw
+template <typename T>
+inline void wrap_error(T t, std::error_code& e) {
+	e.assign(static_cast<int>(t), gnutls_category());
+}
+
+inline const char* error_category::name() const noexcept {
+	return "gnutls";
+}
+
+inline std::string error_category::message(int const error) const noexcept {
+	return std::string(::gnutls_strerror(error));
+}
+
+inline error_category const& error_category::instance() {
+	static error_category ec;
+	return ec;
+}
+
+inline std::error_category const& gnutls_category() noexcept {
+	return error_category::instance();
+}
+
+namespace openpgp {
+
+inline certificate::certificate(std::string const& id) {
+	wrap_error(::gnutls_openpgp_crt_init(&certificate_));
+
+	::gpgme_ctx_t context;
+	::gpgme_error_t error;
+	error = ::gpgme_new(&context);
+	::gpgme_set_protocol(context, GPGME_PROTOCOL_OpenPGP);
+
+	::gpgme_data_t data;
+	error = ::gpgme_data_new(&data);
+	error = ::gpgme_op_export(context, id.c_str(), 0, data);
+
+	::gnutls_datum_t gdata;
+	std::size_t buffer_size;
+	gdata.data = reinterpret_cast<unsigned char*>(::gpgme_data_release_and_get_mem(data, &buffer_size));
+	gdata.size = buffer_size;
+
+	wrap_error(::gnutls_openpgp_crt_import(certificate_, &gdata, GNUTLS_OPENPGP_FMT_RAW));
+	::gpgme_free(gdata.data);
+
+	::gpgme_release(context);
+
+	gnutls_openpgp_keyid_t keyid;
+	wrap_error(::gnutls_openpgp_crt_get_auth_subkey(certificate_, keyid, 1));
+	wrap_error(::gnutls_openpgp_crt_set_preferred_key_id(certificate_, keyid));
+}
+
+inline certificate::certificate(certificate&& c) : certificate_(c.certificate_) {
+	c.certificate_ = nullptr;
+}
+
+inline certificate::~certificate() {
+	if (certificate_)
+		::gnutls_openpgp_crt_deinit(certificate_);
+}
+
+inline certificate::operator gnutls_openpgp_crt_t() const {
+	return certificate_;
+}
+
+
+inline privatekey::privatekey(std::string const& id) {
+	wrap_error(::gnutls_openpgp_privkey_init(&privatekey_));
+
+	std::ostringstream gpg_command;
+	gpg_command << "exec /usr/bin/gpg2 --quiet --batch --no-tty --export-options export-minimal --export-secret-keys -- " << id;
+	std::FILE* stream = ::popen(gpg_command.str().data(), "r");
+
+	std::vector<unsigned char> buffer;
+	buffer.reserve(1024*1024);
+
+	int c;
+	while ((c = std::fgetc(stream)) != EOF)
+		buffer.push_back(c);
+
+	::gnutls_datum_t gdata;
+	gdata.data = const_cast<unsigned char*>(buffer.data());
+	gdata.size = buffer.size();
+	::pclose(stream);
+
+	wrap_error(::gnutls_openpgp_privkey_import(privatekey_, &gdata, GNUTLS_OPENPGP_FMT_RAW, nullptr, 0));
+}
+
+inline privatekey::privatekey(privatekey&& p) : privatekey_(p.privatekey_) {
+	p.privatekey_ = nullptr;
+}
+
+inline privatekey::~privatekey() {
+	if (privatekey_)
+		::gnutls_openpgp_privkey_deinit(privatekey_);
+}
+
+inline privatekey::operator gnutls_openpgp_privkey_t() const {
+	return privatekey_;
+}
+
+
+} // namespace: openpgp
+
+
+inline credentials::credentials(openpgp::certificate&& c, openpgp::privatekey&& p) : certificate_(std::move(c)), privatekey_(std::move(p)) {
+	wrap_error(::gnutls_certificate_allocate_credentials(&credentials_));
+	wrap_error(::gnutls_certificate_set_openpgp_key(credentials_, certificate_, privatekey_));
+}
+
+inline credentials::credentials(credentials&& c) : credentials_(c.credentials_), certificate_(std::move(c.certificate_)), privatekey_(std::move(c.privatekey_)) {
+	c.credentials_ = nullptr;
+}
+
+inline credentials::~credentials() {
+	if (credentials_)
+		::gnutls_certificate_free_credentials(credentials_);
+}
+
+inline void credentials::set(diffie_hellman_parameters const& dh) {
+	::gnutls_certificate_set_dh_params(credentials_, dh.parameters_);
+}
+
+
+inline diffie_hellman_parameters::diffie_hellman_parameters(std::size_t const s) {
+	wrap_error(::gnutls_dh_params_init(&parameters_));
+	wrap_error(::gnutls_dh_params_generate2(parameters_, s));
+}
+
+inline diffie_hellman_parameters::~diffie_hellman_parameters() {
+	::gnutls_dh_params_deinit(parameters_);
+}
+
+
+inline priorities::priorities(std::string const& s) {
+	wrap_error(::gnutls_priority_init(&priorities_, s.data(), nullptr));
+}
+
+inline priorities::~priorities() {
+	::gnutls_priority_deinit(priorities_);
+}
+
+inline priorities::priorities(priorities&& p) : priorities_(p.priorities_) {
+	p.priorities_ = nullptr;
+}
+
+
+inline session::session(bool server, credentials const& c, priorities const& p) {
+	wrap_error(::gnutls_init(&session_, GNUTLS_DATAGRAM | GNUTLS_NONBLOCK | ((server) ? GNUTLS_SERVER : GNUTLS_CLIENT) ));
+	wrap_error(::gnutls_credentials_set(session_, GNUTLS_CRD_CERTIFICATE, c.credentials_));
+	::gnutls_certificate_server_set_request(session_, GNUTLS_CERT_REQUIRE);
+	::gnutls_openpgp_send_cert(session_, GNUTLS_OPENPGP_CERT);
+	wrap_error(::gnutls_priority_set(session_, p.priorities_));
+}
+
+inline session::~session() {
+	if (session_)
+		::gnutls_deinit(session_);
+}
+
+inline session::session(session&& s) : session_(s.session_) {
+	s.session_ = nullptr;
+}
+
+
+} // namespace: gnutls
+
+
+namespace std {
+
+inline error_code make_error_code(gnutls::errc e) {
+	return error_code(static_cast<int>(e), gnutls::gnutls_category());
+}
+
+} // namespace: std

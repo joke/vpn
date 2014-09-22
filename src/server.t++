@@ -5,19 +5,23 @@
 #include <functional>
 
 
-template <typename GatewayProtocol, typename ControllerProtocol, bool Threaded>
-inline server<GatewayProtocol, ControllerProtocol, Threaded>::server() :
+template <typename GatewayProtocol, typename ControllerProtocol, typename ThreadingPolicy>
+inline server<GatewayProtocol, ControllerProtocol, ThreadingPolicy>::server(gnutls::credentials&& c, gnutls::priorities&& p) :
+	credentials_(std::move(c)),
+	priorities_(std::move(p)),
 	io_(),
-	thread_pool_{},
 	signal_{io_},
 	netdevice_{io_, std::bind(&server::send_remote, this, std::placeholders::_1), std::bind(&server::received_local, this, std::placeholders::_1)},
-	gateway_(io_, std::bind(&server::send_local, this, std::placeholders::_1), std::bind(&server::received_remote, this, std::placeholders::_1))
+	session_builder_(io_, credentials_, priorities_),
+	gateway_(io_, session_builder_, std::bind(&server::send_local, this, std::placeholders::_1), std::bind(&server::received_remote, this, std::placeholders::_1))
 {
-	thread_pool_.run(std::bind(static_cast<std::size_t(boost::asio::io_service::*)()>(&boost::asio::io_service::run), std::ref(io_)));
+	int a = 9;
+
+	ThreadingPolicy::run(std::bind(static_cast<std::size_t(boost::asio::io_service::*)()>(&boost::asio::io_service::run), std::ref(io_)));
 }
 
-template <typename GatewayProtocol, typename ControllerProtocol, bool Threaded>
-inline server<GatewayProtocol, ControllerProtocol, Threaded>::~server() {
-// 	run();
+template <typename GatewayProtocol, typename ControllerProtocol, typename ThreadingPolicy>
+inline server<GatewayProtocol, ControllerProtocol, ThreadingPolicy>::~server() {
+// 	run();ThreadingPolicy
 }
 
