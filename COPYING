@@ -1,0 +1,23 @@
+vpn² -- An Open Source VPN
+
+Copyright (C) 2013 Joke de Buhr <joke@seiken.de>
+
+This distribution contains multiple components, some of which fall under
+different licenses. By using this software or any of the bundled components
+enumerated below, you agree to be bound by the conditions of the license for
+each respective component.
+
+
+vpn² license:
+-------------
+
+  vpn² is distributed under the GNU Affero General Public License version 3
+  (see LICENSE file).
+
+
+Boost.ASIO:
+-----------
+
+  Boost.ASIO is distributed under the Boost Software License version 1.0.
+
+

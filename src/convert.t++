@@ -1,0 +1,71 @@
+#ifdef IN_IDE_PARSER
+#include "convert.h++"
+#endif
+
+#include <string>
+#include <iomanip>
+#include <sstream>
+
+#include <boost/asio.hpp>
+
+#include <boost/serialization/split_free.hpp>
+#include <boost/serialization/vector.hpp>
+
+inline std::string to_hex(std::uint8_t const* const data, std::size_t const s, bool uppercase) {
+	using namespace std;
+
+	stringstream ss;
+	ss << hex << setfill('0');
+	if (uppercase)
+		ss << std::uppercase;
+	for (size_t idx(0); idx < s; ++idx)
+		ss << setw(2) << int(data[idx]);
+
+	return ss.str();
+}
+
+template <typename _CharT, typename _Traits>
+inline std::basic_istream<_CharT, _Traits>& operator>>(std::basic_istream<_CharT, _Traits>& s, boost::asio::ip::address& a) {
+	std::string str;
+	s >> str;
+	a.from_string(str);
+	return s;
+}
+
+template <typename _CharT, typename _Traits>
+inline std::basic_istream<_CharT, _Traits>& operator<<(std::basic_istream<_CharT, _Traits>& s, boost::asio::ip::address& a) {
+	s << a.to_string();
+	return s;
+}
+
+
+namespace boost {
+namespace serialization {
+
+template <typename Archive, typename InternetProtocol>
+inline void save(Archive& ar, boost::asio::ip::basic_endpoint<InternetProtocol> const& e, unsigned int const) {
+	// serialization needs to be done from local variable
+	auto address(e.address().to_string());
+	auto port(e.port());
+	ar << address;
+	ar << port;
+}
+
+template <typename Archive, typename InternetProtocol>
+inline void load(Archive& ar, boost::asio::ip::basic_endpoint<InternetProtocol>& e, unsigned int const) {
+	// read value from stream
+	std::string address;
+	short unsigned int port;
+
+	ar >> address;
+	ar >> port;
+	e = boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(address), port);
+}
+
+template <typename Archive, typename InternetProtocol>
+inline void serialize(Archive& ar, boost::asio::ip::basic_endpoint<InternetProtocol>& e, unsigned int const file_version){
+	split_free(ar, e, file_version);
+}
+
+} // namespace: serialization
+} // namespace: boost

@@ -1,0 +1,14 @@
+This is the README file of vpn² an Open Source VPN
+
+  Copyright (C) 2013 Joke de Buhr <joke@seiken.de>
+
+  Copying and distribution of this file, with or without modification,
+  are permitted in any medium without royalty provided the copyright
+  notice and this notice are preserved.
+
+See the files ./INSTALL* for building and installation instructions.
+
+For more information consult the manual. It can be built either from
+within the doc folder or is available for online reading at 
+https://vpn2.readthedocs.org/
+
