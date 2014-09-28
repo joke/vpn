@@ -7,58 +7,55 @@ namespace boost {
 }
 
 #include "program_options.h++"
-#include "server.h++"
-#include "client.h++"
-#include "advertiser.h++"
 
-#include <string>
-#include <sstream>
-#include <boost/asio/ip/address.hpp>
-#include <boost/asio/ip/udp.hpp>
-#include <boost/asio/local/stream_protocol.hpp>
-
-#include "encryption.h++"
-#include <iostream>
-#include <cstdio>
-#include <memory>
-#include <thread>
-#include <functional>
+// #include <string>
+// #include <sstream>
+// #include <boost/asio/ip/address.hpp>
+// #include <boost/asio/ip/udp.hpp>
+// #include <boost/asio/local/stream_protocol.hpp>
+//
+// #include "encryption.h++"
+// #include <iostream>
+// #include <cstdio>
+// #include <memory>
+// #include <thread>
+// #include <functional>
 
 int main(int const argc, char const* const* const argv) {
-	using namespace boost::asio;
+// 	using namespace boost::asio;
 	using namespace std;
 	using namespace cfg;
 
 	parse_command_line(argc, argv);
 
-	boost::asio::io_service io;
+// 	boost::asio::io_service io;
 
-	if (configuration["mode"].as<string>() == "server") {
-		try {
-			// create server
-			server<ip::udp, local::stream_protocol> server{io};
-		} catch (error_code const& e) {
-			cerr << e.message() << endl;
-			exit(EXIT_FAILURE);
-		} catch (exception const& e) {
-			cerr << e.what() << endl;
-			exit(EXIT_FAILURE);
-		} catch (...) {
-			exit(EXIT_FAILURE);
-		}
-	} else if (configuration["mode"].as<string>() == "control") {
-		local::stream_protocol::endpoint socket{configuration["socket"].as<string>()};
-
-		// create client and parse commandline
-		client<local::stream_protocol> client{io, socket};
-
-		if (!configuration["node-del"].empty())
-			for (auto node : configuration["node-del"].as<vector<string>>())
-				client.node_del(node);
-		if (!configuration["node-add"].empty())
-			for (auto node : configuration["node-add"].as<vector<string>>())
-				client.node_add(node);
-		if (!configuration["node-list"].empty())
-			client.node_list();
-	}
+// 	if (configuration["mode"].as<string>() == "server") {
+// 		try {
+// 			// create server
+// 			server<ip::udp, local::stream_protocol> server{io};
+// 		} catch (error_code const& e) {
+// 			cerr << e.message() << endl;
+// 			exit(EXIT_FAILURE);
+// 		} catch (exception const& e) {
+// 			cerr << e.what() << endl;
+// 			exit(EXIT_FAILURE);
+// 		} catch (...) {
+// 			exit(EXIT_FAILURE);
+// 		}
+// 	} else if (configuration["mode"].as<string>() == "control") {
+// 		local::stream_protocol::endpoint socket{configuration["socket"].as<string>()};
+//
+// 		// create client and parse commandline
+// 		client<local::stream_protocol> client{io, socket};
+//
+// 		if (!configuration["node-del"].empty())
+// 			for (auto node : configuration["node-del"].as<vector<string>>())
+// 				client.node_del(node);
+// 		if (!configuration["node-add"].empty())
+// 			for (auto node : configuration["node-add"].as<vector<string>>())
+// 				client.node_add(node);
+// 		if (!configuration["node-list"].empty())
+// 			client.node_list();
+// 	}
 }

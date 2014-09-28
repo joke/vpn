@@ -20,7 +20,7 @@ if (NOT IDN2_LIBRARIES)
 endif()
 
 
-add_executable(vpn main.c++ options.c++ encryption.c++)
+add_executable(vpn main.c++ program_options.c++)
 target_link_libraries(vpn ${GnuTLS_LIBRARIES} ${Boost_LIBRARIES} ${GPGME_LIBRARIES} ${IDN2_LIBRARIES})
 
 add_executable(test test.c++)

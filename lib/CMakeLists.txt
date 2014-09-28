@@ -8,7 +8,7 @@ option(USE_INTERNAL_BOOST "Use internal boost librabry" no)
 set(USE_INTERNAL_BOOST ${USE_INTERNAL_BOOST} PARENT_SCOPE)
 if(NOT USE_INTERNAL_BOOST)
 	include(FindBoost)
-	find_package(Boost 1.53.0 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
+	find_package(Boost 1.56.0 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 	set(Boost_INCLUDE_DIRS ${Boost_INCLUDE_DIRS} PARENT_SCOPE)
 	set(Boost_LIBRARIES ${Boost_LIBRARIES} PARENT_SCOPE)
 else()
@@ -22,8 +22,8 @@ else()
 	set(BOOST_INCLUDED_VERSION TRUE PARENT_SCOPE)
 	include(ExternalProject)
 	ExternalProject_Add(libboost
-		URL http://sourceforge.net/projects/boost/files/boost/1.55.0/boost_1_55_0.tar.bz2/download
-		URL_HASH SHA512=dc606477f4c303e8f40de2586c16394b6d758e198b35bf3a7d3e576a2f49171aadc4f95e8d685fa731bc4e61e19869d5a24e1e816febfca9de078d66e096e041
+		URL http://sourceforge.net/projects/boost/files/boost/1.56.0/boost_1_56_0.tar.bz2/download
+		URL_HASH SHA512=1ce9871c3a2519682538a5f1331938b948123432d99aea0ce026958cbebd25d84019a3a28c452724b9693df98a8d1264bb2d93d2fee508453f8b42836e67481e
 		CONFIGURE_COMMAND <SOURCE_DIR>/bootstrap.sh --with-icu --prefix=<INSTALL_DIR> --with-libraries=${BOOST_COMPONENTS_LIST}
 		BUILD_COMMAND <SOURCE_DIR>/b2 -a --build-dir=<BINARY_DIR> variant=release link=static threading=multi ${BOOST_DEBUG_FLAGS} stage
 		INSTALL_COMMAND <SOURCE_DIR>/b2 -a --build-dir=<BINARY_DIR> variant=release link=static threading=multi ${BOOST_DEBUG_FLAGS} install
@@ -41,7 +41,7 @@ option(USE_INTERNAL_GNUTLS "Use internal gnutls version" no)
 set(USE_INTERNAL_GNUTLS ${USE_INTERNAL_GNUTLS} PARENT_SCOPE)
 if(NOT USE_INTERNAL_GNUTLS)
 	include(FindGnuTLS)
-	find_package(GnuTLS 3.2.7 REQUIRED)
+	find_package(GnuTLS 3.2.18 REQUIRED)
 	set(GNUTLS_INCLUDE_DIR ${GNUTLS_INCLUDE_DIR} PARENT_SCOPE)
 	set(GNUTLS_LIBRARIES ${GNUTLS_LIBRARIES} PARENT_SCOPE)
 	set(GNUTLS_DEFINITIONS ${GNUTLS_DEFINITIONS} PARENT_SCOPE)
@@ -61,7 +61,7 @@ else()
 	)
 	ExternalProject_Add(libgnutls
 		DEPENDS libnettle
-		DOWNLOAD_COMMAND wget -qO- ftp://ftp.gnutls.org/gcrypt/gnutls/v3.2/gnutls-3.2.7.tar.xz | tar --strip-components=1 -JxC <SOURCE_DIR>
+		DOWNLOAD_COMMAND wget -qO- ftp://ftp.gnutls.org/gcrypt/gnutls/v3.2/gnutls-3.2.18.tar.xz | tar --strip-components=1 -JxC <SOURCE_DIR>
 		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-shared=no --without-p11-kit --without-tpm --disable-cxx CPPFLAGS=-I<INSTALL_DIR>/include CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} "CFLAGS=-O3 -g0" "CXXFLAGS=-O3 -g0" LDFLAGS=-L<INSTALL_DIR>/lib PKG_CONFIG_PATH=<INSTALL_DIR>/lib/pkgconfig
 	)
 
