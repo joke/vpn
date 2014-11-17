@@ -11,15 +11,15 @@
 #include <boost/serialization/split_free.hpp>
 #include <boost/serialization/vector.hpp>
 
-inline std::string to_hex(std::uint8_t const* const data, std::size_t const s, bool uppercase) {
+template <typename InputInterator>
+inline std::string to_hex(InputInterator begin, InputInterator end, bool uppercase) {
 	using namespace std;
 
 	stringstream ss;
 	ss << hex << setfill('0');
 	if (uppercase)
 		ss << std::uppercase;
-	for (size_t idx(0); idx < s; ++idx)
-		ss << setw(2) << int(data[idx]);
+	std::for_each(begin, end, [&](auto x) { ss << setw(2) << int(x); });
 
 	return ss.str();
 }
@@ -59,7 +59,7 @@ inline void load(Archive& ar, boost::asio::ip::basic_endpoint<InternetProtocol>&
 
 	ar >> address;
 	ar >> port;
-	e = boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(address), port);
+	//e = boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(address), port);
 }
 
 template <typename Archive, typename InternetProtocol>

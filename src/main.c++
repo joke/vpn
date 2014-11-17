@@ -20,13 +20,29 @@ namespace boost {
 // #include <memory>
 // #include <thread>
 // #include <functional>
+#include "dccp.h++"
+#include "sctp.h++"
+#include <iostream>
+
+#include "gateway.h++"
 
 int main(int const argc, char const* const* const argv) {
-// 	using namespace boost::asio;
+	using namespace boost::asio;
+	using namespace boost::asio::ip;
 	using namespace std;
 	using namespace cfg;
 
 	parse_command_line(argc, argv);
+
+	boost::asio::io_service io;
+	gateway<dccp, sctp, tcp> gateway(
+		io,
+		configuration["dccp"].as<vector<dccp::endpoint>>(),
+		configuration["sctp"].as<vector<sctp::endpoint>>(),
+		configuration["tcp"].as<vector<tcp::endpoint>>()
+	);
+
+	io.run();
 
 // 	boost::asio::io_service io;
 

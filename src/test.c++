@@ -4,92 +4,80 @@
 #include <boost/asio.hpp>
 #include <vector>
 
-namespace services {
 
-template <typename Protocol>
-class datagram_socket_service : public boost::asio::datagram_socket_service<Protocol> {
-private:
-	typedef boost::asio::datagram_socket_service<Protocol> base_type;
 
+class dccp {
 public:
-	/// The unique service identifier.
-	static boost::asio::io_service::id id;
+	/// The type of a DCCP endpoint.
+	typedef boost::asio::ip::basic_endpoint<dccp> endpoint;
 
-	typedef Protocol protocol_type;
-	typedef typename Protocol::endpoint endpoint_type;
-	typedef typename base_type::implementation_type implementation_type;
-	typedef typename base_type::native_handle_type native_handle_type;
-
-	explicit datagram_socket_service(boost::asio::io_service& io_service) : base_type(io_service) {
+	/// Construct to represent the IPv4 DCCP protocol.
+	static dccp v4() {
+		return dccp(BOOST_ASIO_OS_DEF(AF_INET));
 	}
 
-	void shutdown_service() {
-		std::cerr << "_________ shutdown_service _________________" << std::endl;
+	/// Construct to represent the IPv6 DCCP protocol.
+	static dccp v6() {
+		return dccp(BOOST_ASIO_OS_DEF(AF_INET6));
 	}
 
-    /// Construct a new stream socket implementation.
-    void construct(implementation_type& impl) {
-		std::cerr << "_________ construct _________________" << std::endl;
-		int a = impl;
-		base_type::construct(impl);
-    }
-//
-//     /// Destroy a stream socket implementation.
-//     void destroy(implementation_type& impl) {
-// 		std::cerr << "_________ destruct _________________" << std::endl;
-// 		base_type::destroy(impl);
-//     }
-//
-
-	/// Start an asynchronous receive.
-	template <typename Mutable_Buffers, typename Handler>
-	void async_receive_from(implementation_type& impl, const Mutable_Buffers& buffers, endpoint_type& e, boost::asio::socket_base::message_flags flags, Handler handler) {
-		base_type::async_receive(impl, buffers, flags, [&handler](const boost::system::error_code& e, std::size_t bytes_transferred) {
-			handler(e, bytes_transferred);
-		});
+	/// Obtain an identifier for the type of the protocol.
+	int type() const {
+		return SOCK_DCCP;
 	}
 
+	/// Obtain an identifier for the protocol.
+	int protocol() const {
+		return IPPROTO_DCCP;
+	}
+
+	/// Obtain an identifier for the protocol family.
+	int family() const {
+		return family_;
+	}
+
+	/// The DCCP socket type.
+	typedef boost::asio::basic_seq_packet_socket<dccp> socket;
+
+	/// The DCCP acceptor type.
+	typedef boost::asio::basic_socket_acceptor<dccp> acceptor;
+
+	/// The DCCP resolver type.
+	typedef boost::asio::ip::basic_resolver<dccp> resolver;
+
+	/// Compare two protocols for equality.
+	friend bool operator==(const dccp& p1, const dccp& p2) {
+		return p1.family_ == p2.family_;
+	}
+
+	/// Compare two protocols for inequality.
+	friend bool operator!=(const dccp& p1, const dccp& p2) {
+		return p1.family_ != p2.family_;
+	}
+
+private:
+	// Construct with a specific family.
+	explicit dccp(int protocol_family) : family_(protocol_family) {
+	}
+
+	int family_;
 };
-
-template <typename Protocol>
-boost::asio::io_service::id datagram_socket_service<Protocol>::id;
-
-}
-
-
-
-
-
-
-typedef boost::asio::basic_datagram_socket<boost::asio::ip::udp, services::datagram_socket_service<boost::asio::ip::udp>> debug_datagram_socket;
-
 
 int main() {
 
-
 	boost::asio::io_service io;
-
-	debug_datagram_socket::endpoint_type endp(boost::asio::ip::address::from_string("::"), 54321);
-	debug_datagram_socket socket(io, endp);
-	std::vector<char> buf(1024);
-
-	socket.async_receive_from(boost::asio::buffer(buf), endp, [](const boost::system::error_code& error, std::size_t bytes_transferred) {
-		std::cerr << "1___________________________________________" << bytes_transferred << std::endl;
-	});
-	socket.async_receive_from(boost::asio::buffer(buf), endp, [](const boost::system::error_code& error, std::size_t bytes_transferred) {
-		std::cerr << "2___________________________________________" << bytes_transferred << std::endl;
-	});
+	using namespace boost::asio;
 
 
+	dccp::endpoint endp(ip::address::from_string("::"), 54321);
 
-	boost::asio::ip::udp::endpoint unp(boost::asio::ip::address::from_string("::"), 54320);
-	boost::asio::ip::udp::socket sock(io, unp);
+	dccp::acceptor acceptor(io, endp);
+	dccp::socket socket(io);
+	dccp::endpoint endpoint;
+	acceptor.accept(socket, endpoint);
 
-	sock.async_receive_from(boost::asio::buffer(buf), unp, [](const boost::system::error_code& error, std::size_t bytes_transferred) {
-		std::cerr << "3___________________________________________" << bytes_transferred << std::endl;
-	});
+	std::cerr << endpoint << std::endl;
+
 
 	io.run();
-
-
 }

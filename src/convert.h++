@@ -5,7 +5,8 @@
 #include <boost/asio/ip/udp.hpp>
 
 //! convert binary data to hex string
-std::string to_hex(unsigned char const* const data, std::size_t const s, bool uppercase = false);
+template <typename InputInterator>
+inline std::string to_hex(InputInterator begin, InputInterator end, bool uppercase);
 
 //! convert first bytes of binary data to uint64_t
 std::uint64_t to_uint64_t(unsigned char const* const data);
