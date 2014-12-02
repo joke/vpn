@@ -41,7 +41,7 @@ option(USE_INTERNAL_GNUTLS "Use internal gnutls version" no)
 set(USE_INTERNAL_GNUTLS ${USE_INTERNAL_GNUTLS} PARENT_SCOPE)
 if(NOT USE_INTERNAL_GNUTLS)
 	include(FindGnuTLS)
-	find_package(GnuTLS 3.2.18 REQUIRED)
+	find_package(GnuTLS 3.3.10 REQUIRED)
 	set(GNUTLS_INCLUDE_DIR ${GNUTLS_INCLUDE_DIR} PARENT_SCOPE)
 	set(GNUTLS_LIBRARIES ${GNUTLS_LIBRARIES} PARENT_SCOPE)
 	set(GNUTLS_DEFINITIONS ${GNUTLS_DEFINITIONS} PARENT_SCOPE)
@@ -61,8 +61,8 @@ else()
 	)
 	ExternalProject_Add(libgnutls
 		DEPENDS libnettle
-		DOWNLOAD_COMMAND wget -qO- ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.9.tar.xz | tar --strip-components=1 -JxC <SOURCE_DIR>
-		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-shared=no --without-p11-kit --without-tpm --disable-cxx CPPFLAGS=-I<INSTALL_DIR>/include CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} "CFLAGS=-O3 -g0" "CXXFLAGS=-O3 -g0" LDFLAGS=-L<INSTALL_DIR>/lib PKG_CONFIG_PATH=<INSTALL_DIR>/lib/pkgconfig
+		DOWNLOAD_COMMAND wget -qO- ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.10.tar.xz | tar --strip-components=1 -JxC <SOURCE_DIR>
+		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-shared=no --without-p11-kit --without-tpm --disable-cxx CPPFLAGS=-I<INSTALL_DIR>/include CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} "CFLAGS=-O0 -g" "CXXFLAGS=-O0 -g" LDFLAGS=-L<INSTALL_DIR>/lib PKG_CONFIG_PATH=<INSTALL_DIR>/lib/pkgconfig
 	)
 
 	set(GnuTLS_LIBRARIES gnutls nettle hogweed rt z gmp tasn1 PARENT_SCOPE)

@@ -5,13 +5,14 @@
 #include <gnutls/dtls.h>
 #include <gnutls/openpgp.h>
 #include <system_error>
+#include <boost/system/error_code.hpp>
 #include <vector>
 #include <array>
 
 #include <string>
 
 namespace gnutls {
-namespace {
+// namespace {
 
 //! enum with all the gnutls error codes
 enum class errc;
@@ -40,29 +41,29 @@ private:
 	static global* global_;
 };
 
-} // namespace: <>
+// } // namespace: <>
 
 namespace openpgp {
-namespace {
+// namespace {
 
 class certificate;
 class privatekey;
 
-} // namespace: <>
+// } // namespace: <>
 } // namespace: openpgp
 
-namespace {
+// namespace {
 
 //! wrapper around gnutls_datum_t
 class datum {
 public:
 	explicit datum();
 	explicit datum(std::string const& filename);
-	datum(std::vector<std::uint8_t> const&);
 	explicit datum(gnutls_datum_t const*);
 	explicit datum(std::size_t);
+	datum(std::vector<std::uint8_t> const&);
 	~datum();
-	operator gnutls_datum_t*();
+	operator gnutls_datum_t const*() const;
 	gnutls_datum_t const& data() const;
 
 protected:
@@ -88,11 +89,10 @@ public:
 	//! verify callback function used by gntusl
 	static int verify(gnutls_session_t);
 	credentials& operator=(credentials&&);
-
 protected:
 	gnutls_certificate_credentials_t credentials_; //!< credentials
 	gnutls_dh_params_t dh_params_; //!< diffie-hellmann parameter
-	gnutls_priority_t priority_; //! priorities
+	gnutls_priority_t priority_; //!< priorities
 
 private:
 	explicit credentials(credentials const&) = delete;
@@ -132,10 +132,22 @@ private:
 	priorities& operator=(priorities const&) = delete;
 };
 
-} // namespace: <>
+class session {
+public:
+	template <typename SessionPtr, typename PushFunc, typename PullFunc, typename PullTimeoutFunc>
+	session(credentials const&, bool server, SessionPtr, PushFunc, PullFunc, PullTimeoutFunc);
+	~session();
+	void error(boost::system::error_code const&);
+	int handshake();
+	int direction();
+private:
+	gnutls_session_t session_;
+};
+
+// } // namespace: <>
 
 namespace openpgp {
-namespace {
+// namespace {
 
 //! openpgp certificate in gnutls
 class certificate {
@@ -183,9 +195,15 @@ private:
 	privatekey& operator=(privatekey&&) = delete;
 };
 
-} // namespace: <>
+// } // namespace: <>
 } // namespace: openpgp
 } // namespace: gnutls
+
+namespace gnupg {
+
+std::vector<std::uint8_t> export_key(std::string const& id, bool private_key);
+
+} // namespace: gnupg
 
 namespace std {
 

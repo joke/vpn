@@ -7,24 +7,10 @@ namespace boost {
 }
 
 #include "program_options.h++"
-
-// #include <string>
-// #include <sstream>
-// #include <boost/asio/ip/address.hpp>
-// #include <boost/asio/ip/udp.hpp>
-// #include <boost/asio/local/stream_protocol.hpp>
-//
-// #include "encryption.h++"
-// #include <iostream>
-// #include <cstdio>
-// #include <memory>
-// #include <thread>
-// #include <functional>
 #include "dccp.h++"
 #include "sctp.h++"
-#include <iostream>
-
 #include "gateway.h++"
+#include <iostream>
 
 int main(int const argc, char const* const* const argv) {
 	using namespace boost::asio;
@@ -34,15 +20,21 @@ int main(int const argc, char const* const* const argv) {
 
 	parse_command_line(argc, argv);
 
+
+
 	boost::asio::io_service io;
-	gateway<dccp, sctp, tcp> gateway(
+
+	gateway<dccp> gateway(
 		io,
-		configuration["dccp"].as<vector<dccp::endpoint>>(),
-		configuration["sctp"].as<vector<sctp::endpoint>>(),
-		configuration["tcp"].as<vector<tcp::endpoint>>()
+		*(configuration["key"].as<std::shared_ptr<gnutls::credentials>>()),
+		configuration["dccp"].as<vector<dccp::endpoint>>()
+// 			configuration["tcp"].as<vector<tcp::endpoint>>()
+// 			configuration["sctp"].as<vector<sctp::endpoint>>(),
 	);
 
-	io.run();
+	boost::system::error_code ec;
+	io.run(ec);
+	cerr << "________________________ IO EC: " << ec << std::endl;
 
 // 	boost::asio::io_service io;
 

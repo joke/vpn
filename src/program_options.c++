@@ -38,7 +38,7 @@ void validate(any& v, std::vector<std::string> const& values, basic_endpoint<PRO
 } // namespace: boost
 
 namespace gnutls {
-namespace {
+// namespace {
 
 void validate(boost::any& v, std::vector<std::string> const& values, std::shared_ptr<gnutls::priorities>* const e, int const) {
 	using namespace boost;
@@ -70,37 +70,22 @@ void validate(boost::any& v, std::vector<std::string> const& values, std::shared
 	using namespace boost;
 	using namespace program_options;
 
-// 	try {
+	try {
 		validators::check_first_occurrence(v);
 		auto const option(validators::get_single_string(values));
 
 		auto const public_key = gnupg::export_key(option, false);
 		auto const private_key = gnupg::export_key(option, true);
-
-
-
-		credentials c;
-		gnutls_certificate_credentials_t gc = c;
-		int res = gnutls_certificate_set_openpgp_key_file2(gc, "/dev/shm/pub", "/dev/shm/priv", "061F0B990EBD603D", GNUTLS_OPENPGP_FMT_RAW);
-
-
-		std::cerr << "____________________________________________________________________________________________ DONE " << res << std::endl;
-
-
-
-		gnutls::openpgp::privatekey priv(private_key);
 		gnutls::openpgp::certificate cert(public_key);
-
-
-// 		gnutls::credentials(
+		gnutls::openpgp::privatekey priv(private_key);
 
 		v = any(std::make_shared<gnutls::credentials>(cert, priv));
-// 	} catch (std::exception const& e) {
-// 		throw validation_error(validation_error::invalid_option_value);
-// 	}
+	} catch (std::exception const& e) {
+		throw validation_error(validation_error::invalid_option_value);
+	}
 }
 
-}
+// }
 }
 
 namespace cfg {
@@ -138,6 +123,11 @@ void parse_command_line(int const argc, char const* const* const argv) {
 			->default_value(vector<tcp::endpoint>(), "{}")
 			->implicit_value(vector<tcp::endpoint>{{address_v6::any(), 54321}}, "[::]:54321"),
 			"TCP address and port to bind to. Can be specified multiple times.")
+		("connect", value<vector<dccp::endpoint>>()
+// 			->composing()
+// 			->default_value(vector<dccp::endpoint>(), "{}")
+			->implicit_value(vector<dccp::endpoint>{{address_v4::any(), 54321}}, "[::]:54321"),
+			"DCCP address and port to bind to. Can be specified multiple times.")
 
 // 		("socket", value<string>()->default_value("/var/run/vpn.sock"), "server socket to bind to")
 // 		("device", value<string>()->default_value(""), "name of device")
@@ -162,7 +152,7 @@ void parse_command_line(int const argc, char const* const* const argv) {
 	options_description gnupg("gnupg options");
 	gnupg.add_options()
 		("gpg", value<string>()->default_value("/usr/bin/gpg"), "path to GnuPG executable")
-		("key", value<shared_ptr<gnutls::credentials>>(), "gnupg key to use")
+		("key", value<shared_ptr<gnutls::credentials>>()->required(), "gnupg key to use")
 // 		("key", value<gnutls::priorities>(), "gnupg key")
 // 		("key", value<string>()->required(), "private key to use")
 // 		("subkey", value<string>()->default_value("auto"), "subkey to use")
@@ -192,14 +182,14 @@ void parse_command_line(int const argc, char const* const* const argv) {
 			groups.add(controller);
 
 		if (!configuration["config"].empty())
-			store(parse_config_file<char>(configuration["config"].as<string>().c_str(), groups, false), configuration);
+			store(parse_config_file<char>(configuration["config"].as<string>().data(), groups, false), configuration);
 
 		store(parse_command_line(argc, argv, groups), configuration);
 	}
 
 	if (configuration.count("help")) {
 		cout << groups << endl;
-		exit(EXIT_FAILURE);
+		exit(EXIT_SUCCESS);
 	}
 
 	notify(configuration);

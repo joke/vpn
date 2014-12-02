@@ -2,11 +2,13 @@
 #include "encryption.h++"
 #endif
 
+// #include "program_options.h++"
 #include <iostream>
 #include "convert.h++"
+#include "program_options.h++"
 
 namespace gnutls {
-namespace {
+// namespace {
 
 enum class errc {
 	again = GNUTLS_E_AGAIN,
@@ -189,6 +191,12 @@ inline global::global() {
 	if (!::gnutls_check_version("3.3.9"))
 		throw std::runtime_error("wrong gnutls version");
 	wrap_error(::gnutls_global_init());
+
+	gnutls_global_set_log_level(99);
+	gnutls_global_set_log_function([](int level, const char* m) {
+		std::cerr << "[gnutls|" << level << "]" << m << std::flush;
+	});
+
 //	if (!::gpgme_check_version("1.2.0"))
 //		throw std::runtime_error("wrong gpgme version");
 //	if (::gpgme_engine_check_version(GPGME_PROTOCOL_OpenPGP) != GPG_ERR_NO_ERROR)
@@ -202,7 +210,7 @@ inline global::~global() {
 
 
 
-} // namespace: <>
+// } // namespace: <>
 } // namespace: gnutls
 
 
@@ -211,7 +219,7 @@ inline global::~global() {
 
 
 namespace gnutls {
-namespace {
+// namespace {
 
 inline datum::datum() : datum_(), datum_p_(nullptr) {
 }
@@ -238,9 +246,9 @@ inline datum::~datum() {
 	// 		::gnutls_free(static_cast<void*>(datum_.data));
 }
 
-inline datum::operator gnutls_datum_t*() {
+inline datum::operator gnutls_datum_t const*() const {
 	if (datum_p_)
-		return const_cast<gnutls_datum_t*>(datum_p_);
+		return datum_p_;
 	return &datum_;
 }
 
@@ -259,7 +267,7 @@ inline credentials::~credentials() {
 }
 
 inline credentials::operator gnutls_certificate_credentials_t() const {
-	return credentials_;
+	return const_cast<gnutls_certificate_credentials_t>(credentials_);
 }
 
 inline credentials::operator gnutls_priority_t() const {
@@ -271,6 +279,11 @@ inline credentials::credentials() : credentials_(nullptr), dh_params_(nullptr), 
 
 inline credentials::credentials(openpgp::certificate& c, openpgp::privatekey& p) : credentials_(nullptr), dh_params_(nullptr), priority_(nullptr) {
 	wrap_error(::gnutls_certificate_allocate_credentials(&credentials_));
+
+	wrap_error(::gnutls_certificate_set_openpgp_key(credentials_, c, p));
+
+
+
 
 // 	auto subkey(cfg::configuration["subkey"].as<std::string>());
 // 	if (subkey == "auto") {
@@ -293,7 +306,6 @@ inline credentials::credentials(openpgp::certificate& c, openpgp::privatekey& p)
 // 	wrap_error(::gnutls_openpgp_privkey_get_preferred_key_id(p, keyid));
 //
 // 	wrap_error(::gnutls_certificate_set_openpgp_key(credentials_, c, p));
-// 	wrap_error(::gnutls_priority_init(&priority_, cfg::configuration["priorities"].as<std::string>().data(), nullptr));
 // 	wrap_error(::gnutls_dh_params_init(&this->dh_params_));
 // 	wrap_error(::gnutls_dh_params_generate2(this->dh_params_, cfg::configuration["dh"].as<std::size_t>()));
 // 	::gnutls_certificate_set_dh_params(credentials_, dh_params_);
@@ -326,6 +338,10 @@ inline priorities::~priorities() {
 	::gnutls_priority_deinit(priorities_);
 }
 
+inline priorities::operator gnutls_priority_t() const {
+	return priorities_;
+}
+
 
 inline diffie_hellman::diffie_hellman(std::size_t bits) {
 	wrap_error(::gnutls_dh_params_init(&diffie_hellman_));
@@ -336,21 +352,66 @@ inline diffie_hellman::~diffie_hellman() {
 	::gnutls_dh_params_deinit(diffie_hellman_);
 }
 
+inline diffie_hellman::operator gnutls_dh_params_t() const {
+	return diffie_hellman_;
+}
 
-} // namespace: <>
+template <typename SessionPtr, typename PushFunc, typename PullFunc, typename PullTimeoutFunc>
+inline session::session(credentials const& c, bool server, SessionPtr s, PushFunc push, PullFunc pull, PullTimeoutFunc pull_timeout) {
+	wrap_error(::gnutls_init(&session_, ((server) ? GNUTLS_SERVER : GNUTLS_CLIENT) | GNUTLS_DATAGRAM | GNUTLS_NONBLOCK));
+	wrap_error(::gnutls_credentials_set(session_, GNUTLS_CRD_CERTIFICATE, gnutls_certificate_credentials_t(c)));
+
+
+	gnutls_certificate_set_verify_function(gnutls_certificate_credentials_t(c), [](gnutls_session_t) -> int {
+		std::cerr << "_________________________________ VERIFY _________________________________" << std::endl;
+		return 0;
+	});
+	::gnutls_certificate_set_dh_params(gnutls_certificate_credentials_t(c), *cfg::configuration["dh"].as<std::shared_ptr<gnutls::diffie_hellman>>());
+
+
+
+	wrap_error(::gnutls_priority_set(session_, *cfg::configuration["priorities"].as<std::shared_ptr<gnutls::priorities>>()));
+
+	::gnutls_certificate_server_set_request(session_, GNUTLS_CERT_REQUIRE);
+	::gnutls_openpgp_send_cert(session_, GNUTLS_OPENPGP_CERT);
+// 	wrap_error(::gnutls_heartbeat_enable(session_, GNUTLS_HB_PEER_ALLOWED_TO_SEND));
+	::gnutls_session_set_ptr(session_, s);
+	::gnutls_transport_set_ptr(session_, s);
+
+	::gnutls_transport_set_pull_function(session_, pull);
+	::gnutls_transport_set_push_function(session_, push);
+	::gnutls_transport_set_pull_timeout_function(session_, pull_timeout);
+	::gnutls_handshake_set_timeout(session_, 59000);
+	::gnutls_dtls_set_timeouts(session_, 60000, 66000);
+}
+
+inline session::~session() {
+	::gnutls_deinit(session_);
+}
+
+inline void session::error(boost::system::error_code const& ec) {
+	::gnutls_transport_set_errno(session_, ec.value());
+}
+
+inline int session::handshake() {
+	return ::gnutls_handshake(session_);
+}
+
+inline int session::direction() {
+	return ::gnutls_record_get_direction(session_);
+}
+
+
+// } // namespace: <>
 
 namespace openpgp {
-namespace {
+// namespace {
 
 inline certificate::certificate(datum const& d) : certificate_() {
 	wrap_error(::gnutls_openpgp_crt_init(&certificate_));
-	std::cerr << "_______________________ size: " << d.data().size << std::endl;
-
-	gnutls_datum_t gd = d.data();
-	std::cerr << to_hex(gd.data, gd.data+gd.size, true) << std::endl;
-
-	wrap_error(::gnutls_openpgp_crt_import(certificate_, &d.data(), GNUTLS_OPENPGP_FMT_RAW));
-	std::cerr << "___________________________________________________________________" << std::endl;
+	wrap_error(::gnutls_openpgp_crt_import(certificate_, d, GNUTLS_OPENPGP_FMT_RAW));
+	// TODO fix subkey handling
+	wrap_error(::gnutls_openpgp_crt_set_preferred_key_id(certificate_, nullptr));
 }
 
 inline certificate::~certificate() {
@@ -385,9 +446,9 @@ inline std::array<std::uint8_t, 8> certificate::authsubkey() const {
 
 
 inline privatekey::privatekey(datum const& d) : privatekey_() {
-	// TODO return val
-	::gnutls_openpgp_privkey_init(&privatekey_);
-	::gnutls_openpgp_privkey_import(privatekey_, *const_cast<datum*>(&d), GNUTLS_OPENPGP_FMT_RAW, nullptr, 0);
+	wrap_error(::gnutls_openpgp_privkey_init(&privatekey_));
+	wrap_error(::gnutls_openpgp_privkey_import(privatekey_, d, GNUTLS_OPENPGP_FMT_RAW, nullptr, 0));
+	wrap_error(::gnutls_openpgp_privkey_set_preferred_key_id(privatekey_, nullptr));
 }
 
 inline privatekey::~privatekey() {
@@ -404,8 +465,7 @@ inline std::vector<std::uint8_t> privatekey::fingerprint() const {
 
 	size_t length(20);
 	vector<uint8_t> fp(length);
-	// TODO return value
-	::gnutls_openpgp_privkey_get_fingerprint(privatekey_, fp.data(), &length);
+	wrap_error(::gnutls_openpgp_privkey_get_fingerprint(privatekey_, fp.data(), &length));
 	fp.resize(length);
 	return fp;
 }
@@ -414,51 +474,9 @@ inline void privatekey::preferred(std::array<std::uint8_t, 8> const& keyid) {
 	wrap_error(::gnutls_openpgp_privkey_set_preferred_key_id(privatekey_, keyid.data()));
 }
 
-} // namespace: <>
+// } // namespace: <>
 } // namespace: openpgp
 } // namespace: gnutls
-
-#include <boost/asio.hpp>
-#include <cstdio>
-
-#include "convert.h++"
-namespace gnupg {
-namespace {
-
-std::vector<std::uint8_t> export_key(std::string const& id, bool private_key) {
-	std::stringstream command;
-	command << "/usr/bin/gpg2 --batch --no-tty --no --openpgp --export-options export-minimal "
-		<< ((private_key) ? "--export " : "--export-secret-keys ")
-		<< id;
-
-	std::cerr << "_________ command: " << command.str() << std::endl;
-
-	std::FILE* pipe = ::popen(command.str().data(), "r");
-
-	boost::asio::io_service io;
-	boost::asio::posix::stream_descriptor s(io, ::fileno(pipe));
-
-	std::vector<std::uint8_t> buffer(102400);
-	boost::system::error_code ec;
-	std::size_t n = boost::asio::read(s, boost::asio::buffer(buffer), boost::asio::transfer_all(), ec);
-	if (ec) {
-		// An error occurred.
-	} else {
-		// n == 128
-	}
-	buffer.resize(n);
-
-	std::cerr << "_______________________ size:: " << buffer.size() << std::endl;
-
-
-	::pclose(pipe);
-
-	return buffer;
-}
-
-} // namespace: <>
-} // namespace: gnupg
-
 
 namespace std {
 

@@ -66,4 +66,20 @@ private:
 	int family_;
 };
 
+namespace boost {
+namespace asio {
+
+//! Open a sequenced packet socket.
+template <>
+inline boost::system::error_code seq_packet_socket_service<dccp>::open(implementation_type& impl, const protocol_type& protocol, boost::system::error_code& ec) {
+	if (protocol.type() == SOCK_DCCP)
+		service_impl_.open(impl, protocol, ec);
+	else
+		ec = boost::asio::error::invalid_argument;
+	return ec;
+}
+
+} // namespace: asio
+} // namespace: boost
+
 #endif
