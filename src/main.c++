@@ -24,13 +24,20 @@ int main(int const argc, char const* const* const argv) {
 
 	boost::asio::io_service io;
 
-	gateway<dccp> gateway(
+	gateway<tcp, dccp, sctp> gateway(
 		io,
 		*(configuration["key"].as<std::shared_ptr<gnutls::credentials>>()),
-		configuration["dccp"].as<vector<dccp::endpoint>>()
-// 			configuration["tcp"].as<vector<tcp::endpoint>>()
-// 			configuration["sctp"].as<vector<sctp::endpoint>>(),
+			configuration["tcp"].as<vector<tcp::endpoint>>(),
+			configuration["dccp"].as<vector<dccp::endpoint>>(),
+			configuration["sctp"].as<vector<sctp::endpoint>>()
 	);
+
+	if (!configuration["c-dccp"].empty())
+		gateway.connect(configuration["c-dccp"].as<vector<dccp::endpoint>>());
+	if (!configuration["c-sctp"].empty())
+		gateway.connect(configuration["c-sctp"].as<vector<sctp::endpoint>>());
+	if (!configuration["c-tcp"].empty())
+		gateway.connect(configuration["c-tcp"].as<vector<tcp::endpoint>>());
 
 	boost::system::error_code ec;
 	io.run(ec);

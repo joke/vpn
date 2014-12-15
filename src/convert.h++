@@ -6,7 +6,7 @@
 
 //! convert binary data to hex string
 template <typename InputInterator>
-inline std::string to_hex(InputInterator begin, InputInterator end, bool uppercase);
+inline std::string to_hex(InputInterator begin, InputInterator end, bool uppercase = false);
 
 //! convert first bytes of binary data to uint64_t
 std::uint64_t to_uint64_t(unsigned char const* const data);

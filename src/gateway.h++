@@ -23,6 +23,9 @@ public:
 protected:
 	boost::asio::io_service& io_;
 	gnutls::credentials const& credentials_;
+
+protected:
+	void connect();
 };
 
 template<typename Protocol, typename... Protocols>
@@ -32,36 +35,40 @@ public:
 	gateway<Protocols...>(io, c, args...) {
 		using namespace std;
 
-		if (!cfg::configuration["connect"].empty()) {
-
-			typedef typename Protocol::socket socket_type;
-			socket_type socket(this->io_);
-
-			std::cerr << "_________________:::" << cfg::configuration["connect"].as<vector<dccp::endpoint>>().front() << endl;
-// 			socket.open(dccp::v4());
-// 			socket.native_non_blocking(true);
-			socket.connect(cfg::configuration["connect"].as<vector<dccp::endpoint>>().front());
-			int a = 0;
-
-			auto it = sessions_.emplace(end(sessions_), move(socket), this->credentials_, false);
-			it->unregister([this, it](){ sessions_.erase(it); });
-			it->start();
-		} else {
-
-			for_each(begin(e), end(e), [&](auto const& e) {
-				acceptors_.emplace_front(io, e);
-				auto& acceptor(acceptors_.front());
-				acceptor.native_non_blocking(true);
-				auto socket(make_shared<typename Protocol::socket>(io));
-				acceptor.async_accept(*socket, std::bind(&gateway::session, this, ref(acceptor), socket, placeholders::_1));
-			});
-
-		}
+		for_each(begin(e), end(e), [&](auto const& e) {
+			acceptors_.emplace_front(io, e);
+			auto& acceptor(acceptors_.front());
+			acceptor.native_non_blocking(true);
+			auto socket(make_shared<typename Protocol::socket>(io));
+			acceptor.async_accept(*socket, std::bind(&gateway::session, this, ref(acceptor), socket, placeholders::_1));
+		});
 	}
 
+	void connect(std::vector<typename Protocol::endpoint> const& endpoints) {
+		typedef typename Protocol::socket socket_type;
+		socket_type socket(this->io_);
+
+		// 			socket.open(dccp::v4());
+
+		socket.connect(endpoints.front());
+		socket.native_non_blocking(true);
+
+		auto it = sessions_.emplace(end(sessions_), std::move(socket), this->credentials_, false);
+		it->unregister([this, it](){ sessions_.erase(it); });
+		it->start();
+	}
+
+	using  gateway<Protocols...>::connect;
+
+protected:
 	void session(typename Protocol::acceptor& acceptor,std::shared_ptr<typename Protocol::socket> socket, boost::system::error_code const& error) {
 		using namespace std;
 		typedef typename Protocol::socket socket_type;
+
+		{
+			auto socket(make_shared<typename Protocol::socket>(this->io_));
+			acceptor.async_accept(*socket, std::bind(&gateway::session, this, ref(acceptor), socket, placeholders::_1));
+		}
 
 		std::cerr << "______________________________ QUEUE size: " << sessions_.size() << std::endl;
 
@@ -69,11 +76,6 @@ public:
 		auto it = sessions_.emplace(end(sessions_), move(*socket), this->credentials_, true);
 		it->unregister([this, it](){ sessions_.erase(it); });
 		it->start();
-
-		{
-			auto socket(make_shared<typename Protocol::socket>(this->io_));
-			acceptor.async_accept(*socket, std::bind(&gateway::session, this, ref(acceptor), socket, placeholders::_1));
-		}
 	}
 
 protected:

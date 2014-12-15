@@ -123,11 +123,21 @@ void parse_command_line(int const argc, char const* const* const argv) {
 			->default_value(vector<tcp::endpoint>(), "{}")
 			->implicit_value(vector<tcp::endpoint>{{address_v6::any(), 54321}}, "[::]:54321"),
 			"TCP address and port to bind to. Can be specified multiple times.")
-		("connect", value<vector<dccp::endpoint>>()
+		("c-sctp", value<vector<sctp::endpoint>>()
 // 			->composing()
 // 			->default_value(vector<dccp::endpoint>(), "{}")
-			->implicit_value(vector<dccp::endpoint>{{address_v4::any(), 54321}}, "[::]:54321"),
+			->implicit_value(vector<sctp::endpoint>{{address_v4::any(), 54321}}, "[::]:54321"),
 			"DCCP address and port to bind to. Can be specified multiple times.")
+		("c-dccp", value<vector<dccp::endpoint>>()
+		// 			->composing()
+		// 			->default_value(vector<dccp::endpoint>(), "{}")
+		->implicit_value(vector<dccp::endpoint>{{address_v4::any(), 54321}}, "[::]:54321"),
+		 "DCCP address and port to bind to. Can be specified multiple times.")
+		("c-tcp", value<vector<tcp::endpoint>>()
+		// 			->composing()
+		// 			->default_value(vector<dccp::endpoint>(), "{}")
+		->implicit_value(vector<tcp::endpoint>{{address_v4::any(), 54321}}, "[::]:54321"),
+		 "DCCP address and port to bind to. Can be specified multiple times.")
 
 // 		("socket", value<string>()->default_value("/var/run/vpn.sock"), "server socket to bind to")
 // 		("device", value<string>()->default_value(""), "name of device")

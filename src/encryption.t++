@@ -188,9 +188,9 @@ inline std::error_category const& gnutls_category() noexcept {
 
 inline global::global() {
 	// check correct linkage
-	if (!::gnutls_check_version("3.3.9"))
+	if (!::gnutls_check_version("3.3.10"))
 		throw std::runtime_error("wrong gnutls version");
-	wrap_error(::gnutls_global_init());
+// 	wrap_error(::gnutls_global_init());
 
 	gnutls_global_set_log_level(99);
 	gnutls_global_set_log_function([](int level, const char* m) {
@@ -204,8 +204,8 @@ inline global::global() {
 }
 
 inline global::~global() {
-	::gnutls_global_deinit();
-	delete this->global_;
+// 	::gnutls_global_deinit();
+// 	delete this->global_;
 }
 
 

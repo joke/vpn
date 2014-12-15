@@ -61,7 +61,7 @@ else()
 	)
 	ExternalProject_Add(libgnutls
 		DEPENDS libnettle
-		DOWNLOAD_COMMAND wget -qO- ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.10.tar.xz | tar --strip-components=1 -JxC <SOURCE_DIR>
+		DOWNLOAD_COMMAND wget -qO- ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.11.tar.xz | tar --strip-components=1 -JxC <SOURCE_DIR>
 		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-shared=no --without-p11-kit --without-tpm --disable-cxx CPPFLAGS=-I<INSTALL_DIR>/include CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} "CFLAGS=-O0 -g" "CXXFLAGS=-O0 -g" LDFLAGS=-L<INSTALL_DIR>/lib PKG_CONFIG_PATH=<INSTALL_DIR>/lib/pkgconfig
 	)
 
