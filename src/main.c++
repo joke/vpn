@@ -11,6 +11,7 @@ namespace boost {
 #include "sctp.h++"
 #include "gateway.h++"
 #include <iostream>
+#include "server.h++"
 
 int main(int const argc, char const* const* const argv) {
 	using namespace boost::asio;
@@ -20,28 +21,22 @@ int main(int const argc, char const* const* const argv) {
 
 	parse_command_line(argc, argv);
 
-
-
-	boost::asio::io_service io;
-
-	gateway<tcp, dccp, sctp> gateway(
-		io,
+	server<tcp, dccp, sctp> server(
+		configuration["threads"].as<size_t>(),
 		*(configuration["key"].as<std::shared_ptr<gnutls::credentials>>()),
-			configuration["tcp"].as<vector<tcp::endpoint>>(),
-			configuration["dccp"].as<vector<dccp::endpoint>>(),
-			configuration["sctp"].as<vector<sctp::endpoint>>()
+		configuration["tcp"].as<vector<tcp::endpoint>>(),
+		configuration["dccp"].as<vector<dccp::endpoint>>(),
+		configuration["sctp"].as<vector<sctp::endpoint>>()
 	);
 
 	if (!configuration["c-dccp"].empty())
-		gateway.connect(configuration["c-dccp"].as<vector<dccp::endpoint>>());
+		server.connect(configuration["c-dccp"].as<vector<dccp::endpoint>>());
 	if (!configuration["c-sctp"].empty())
-		gateway.connect(configuration["c-sctp"].as<vector<sctp::endpoint>>());
+		server.connect(configuration["c-sctp"].as<vector<sctp::endpoint>>());
 	if (!configuration["c-tcp"].empty())
-		gateway.connect(configuration["c-tcp"].as<vector<tcp::endpoint>>());
+		server.connect(configuration["c-tcp"].as<vector<tcp::endpoint>>());
 
-	boost::system::error_code ec;
-	io.run(ec);
-	cerr << "________________________ IO EC: " << ec << std::endl;
+	server.run();
 
 // 	boost::asio::io_service io;
 

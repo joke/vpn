@@ -144,7 +144,7 @@ void parse_command_line(int const argc, char const* const* const argv) {
 // 		("autoconnect", "autoconnect to peers based on keyring")
 // 		("advertize", value<vector<string>>(), "advertize prefix")
 // 		("lan-connect", "enable ipv6 forwarding and configure devices (dangerous without firewall)")
-// 		("threads", value<size_t>()->default_value(0), "the number of threads")
+		("threads", value<size_t>()->default_value(0), "the number of threads")
 // 		("link-local", value<bool>()->default_value(false), "enable link local routing")
 	;
 
