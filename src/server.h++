@@ -19,12 +19,19 @@ public:
 		netdevice_(io_),
 		gateway_(io_, gateway_args...) {
 			threads_.reserve(threads);
-			netdevice_.run();
+			netdevice_.startup();
+			gateway_.startup();
 	}
 
 	void run() {
-		for (std::size_t begin(0), end(threads_.capacity()); begin != end; ++end)
-			threads_.emplace_back(std::bind(static_cast<std::size_t(boost::asio::io_service::*)()>(&boost::asio::io_service::run), std::ref(io_)));
+		if (threads_.capacity() > 0) {
+			for (std::size_t begin(0), end(threads_.capacity()); begin != end; ++end)
+				threads_.emplace_back(std::bind(static_cast<std::size_t(boost::asio::io_service::*)()>(&boost::asio::io_service::run), std::ref(io_)));
+
+			for (auto& thread : threads_)
+				thread.join();
+		} else
+			io_.run();
 	}
 
 	template <typename T>

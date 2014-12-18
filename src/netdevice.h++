@@ -18,8 +18,8 @@ public:
 	//! just destruction
 	~netdevice() noexcept;
 
-	//! run
-	void run();
+	//! startup
+	void startup();
 	//! check if the device is up
 	bool is_up() const;
 	//! query the mtu
