@@ -53,7 +53,7 @@ else()
 	)
 	ExternalProject_Add(libnettle
 		DEPENDS ${LIB_GMP_DEPEND}
-		URL http://www.lysator.liu.se/~nisse/archive/nettle-2.7.tar.gz
+		URL http://ftp.gnu.org/gnu/nettle/nettle-2.7.tar.gz
 		URL_HASH SHA512=394cbe567f958594e1bca42b48802e2fbc9c31c468cd1c399a0aec6f94138220b4bf3c307590262314664e15a74a7a52f9fd2b4f9fb01dde669e1fbe23e57caf
 		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --libdir=<INSTALL_DIR>/lib --disable-shared --disable-openssl --disable-documentation LDFLAGS=-L<INSTALL_DIR>/lib CPPFLAGS=-I<INSTALL_DIR>/include CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} "CFLAGS=-O3 -g0" "CXXFLAGS=-O3 -g0"
 		BUILD_COMMAND make install
