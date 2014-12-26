@@ -20,10 +20,10 @@
 #include <memory>
 
 template <typename Server>
-inline netdevice<Server>::netdevice(boost::asio::io_service& io) :
+inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string name) :
 	io_(io),
 	strand_(io_),
-	name_(""),
+	name_(name),
 	stream_descriptor_(io_)
 {
 	using namespace std;
@@ -41,9 +41,12 @@ inline netdevice<Server>::netdevice(boost::asio::io_service& io) :
 	ioctl set(TUNSETIFF, &req);
 	stream_descriptor_.io_control(set);
 	name_ = req.ifr_name;
-	// needs to be reassigned after this specific ioctl
+// 	needs to be reassigned after this specific ioctl
 	stream_descriptor_.release();
 	stream_descriptor_.assign(fd);
+	stream_descriptor_.native_non_blocking(true);
+	
+	std::cerr << "______________IS OPEN : " << stream_descriptor_.is_open() << "_________ fd: " << fd << std::endl;
 
 	// calculate address from fingerprint
 // // 	stringstream add;
@@ -59,13 +62,18 @@ inline netdevice<Server>::netdevice(boost::asio::io_service& io) :
 // //
 // // 	// route up and go
 // // 	address(boost::asio::ip::address_v6::from_string(add.str()));
-// // 	route(boost::asio::ip::address_v6::from_string("fc::"), 64);
-	up();
-	mtu(1280);
+	
+	system(string("ifconfig " + name_ + " up add fc45:7f3:398a:6e1f:8e7::4/8").data());
+	
+// 	address(boost::asio::ip::address_v6::from_string("fc44:07f3:398a:6e1F:08e7:7756:ff39:029e"));
+// 	route(boost::asio::ip::address_v6::from_string("fc::"), 64);
+// 	up();
+// 	mtu(1280);
 }
 
 template <typename Server>
 inline void netdevice<Server>::startup() {
+	std::cerr << __FILE__ << " " << __LINE__ << " " << __FUNCTION__ << std::endl;
 	accept();
 }
 
@@ -194,7 +202,7 @@ template <typename Server>
 inline void netdevice<Server>::route(boost::asio::ip::address_v6 const&, std::uint8_t const prefix) {
 	using namespace std;
 
-	system(string(string("ip -6 route add fc00::/8 metric 64 dev ") + name_).data());
+	system(string("ip -6 route add fc00::/8 metric 64 dev " + name_).data());
 
 	//io_service io;
 	//in6_rtmsg route({});
@@ -206,7 +214,10 @@ inline void netdevice<Server>::accept() {
 	using namespace placeholders;
 
 	auto buffer(make_shared<vector<uint8_t>>());
-	stream_descriptor_.async_read_some(boost::asio::buffer(*buffer), bind(&netdevice<Server>::read, this, buffer, _1, _2));
+	buffer->resize(4096);
+	
+	stream_descriptor_.async_read_some(boost::asio::buffer(*buffer, 4096), bind(&netdevice<Server>::read, this, buffer, _1, _2));
+	std::cerr << __FILE__ << " " << __LINE__ << " " << __FUNCTION__ << " :::: size: " << std::endl;
 }
 
 
@@ -218,17 +229,22 @@ inline void netdevice<Server>::send(boost::asio::const_buffers_1 b) {
 template <typename Server>
 inline void netdevice<Server>::read(std::shared_ptr<std::vector<std::uint8_t>> buffer, boost::system::error_code const& error, std::size_t bytes_transferred) {
 	using namespace std;
+	
+	std::cerr << __FILE__ << " " << __LINE__ << " " << __FUNCTION__ << " buffercapa: " << buffer->capacity() << " buffersize: " << buffer->size() << std::endl;
 
-	accept();
 
-	std::cerr << "______________________________________________ READ NET __________________________________" << std::endl;
+	std::cerr << "______________________________________________ READ NET __________________________________" << error << " :: " << bytes_transferred << std::endl;
 
 	// TODO: check for errors
 	if (error)
 		return;
 
 	std::cerr << "______________________________________________ READ NET 2__________________________________" << error << std::endl;
+	
+// 	if (bytes_transferred == 0)
+// 		return;
 
+	accept();
 
 // 	gateway_.forward(boost::asio::buffer(const_cast<const uint8_t*>(buffer->data()), bytes_transferred));
 }

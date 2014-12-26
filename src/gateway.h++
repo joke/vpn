@@ -38,11 +38,7 @@ public:
 			acceptors_.emplace_front(io, e);
 			auto& acceptor(acceptors_.front());
 			acceptor.native_non_blocking(true);
-			std::cerr << "______________________ACCEPT1" << std::endl;
-
 		});
-		std::cerr << "______________________ACCEPT2" << std::endl;
-
 	}
 
 	void startup() {
@@ -50,7 +46,6 @@ public:
 		gateway<Protocols...>::startup();
 
 		for_each(begin(acceptors_), end(acceptors_), [&](auto& acceptor) {
-			std::cerr << "______________________ACCEPT" << std::endl;
 			auto socket(make_shared<typename Protocol::socket>(this->io_));
 			acceptor.async_accept(*socket, bind(&gateway::session, this, ref(acceptor), socket, placeholders::_1));
 		});
@@ -73,16 +68,13 @@ public:
 protected:
 	void session(typename Protocol::acceptor& acceptor,std::shared_ptr<typename Protocol::socket> socket, boost::system::error_code const& error) {
 		using namespace std;
-		typedef typename Protocol::socket socket_type;
-
+		
 		std::cerr << "______________________________ QUEUE size: " << sessions_.size() << std::endl;
 
 		{
 			auto socket(make_shared<typename Protocol::socket>(this->io_));
 			acceptor.async_accept(*socket, std::bind(&gateway::session, this, ref(acceptor), socket, placeholders::_1));
 		}
-
-
 
 		socket->native_non_blocking(true);
 		auto it = sessions_.emplace(end(sessions_), move(*socket), this->credentials_, true);

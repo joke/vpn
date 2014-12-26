@@ -20,6 +20,7 @@ public:
 		strand_(socket_.get_io_service()),
 		operation_((server) ? operation_state::start : operation_state::handshake),
 		server_(server),
+		unregister_(),
 		ec_(EAGAIN, boost::system::system_category()),
 		receive_out_flags_(),
 		receive_in_flags_(),
@@ -108,19 +109,17 @@ protected:
 private:
 	socket socket_;
 	boost::asio::strand strand_;
-
-	bool handshake_completed_;
-	bool server_;
-	bool bytes_available_;
-
 	operation_state operation_;
+	bool server_;
+	
 
 	std::function<void()> unregister_;
 	boost::system::error_code ec_;
 
-	message_flags receive_in_flags_;
 	message_flags receive_out_flags_;
+	message_flags receive_in_flags_;
 	message_flags send_flags_;
+	bool bytes_available_;
 };
 
 template <>

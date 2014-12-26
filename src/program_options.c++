@@ -140,7 +140,7 @@ void parse_command_line(int const argc, char const* const* const argv) {
 		 "DCCP address and port to bind to. Can be specified multiple times.")
 
 // 		("socket", value<string>()->default_value("/var/run/vpn.sock"), "server socket to bind to")
-// 		("device", value<string>()->default_value(""), "name of device")
+		("device", value<string>()->default_value(""), "name of device")
 // 		("autoconnect", "autoconnect to peers based on keyring")
 // 		("advertize", value<vector<string>>(), "advertize prefix")
 // 		("lan-connect", "enable ipv6 forwarding and configure devices (dangerous without firewall)")

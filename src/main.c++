@@ -23,6 +23,7 @@ int main(int const argc, char const* const* const argv) {
 
 	server<tcp, dccp, sctp> server(
 		configuration["threads"].as<size_t>(),
+		configuration["device"].as<std::string>(),
 		*(configuration["key"].as<std::shared_ptr<gnutls::credentials>>()),
 		configuration["tcp"].as<vector<tcp::endpoint>>(),
 		configuration["dccp"].as<vector<dccp::endpoint>>(),

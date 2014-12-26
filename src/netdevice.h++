@@ -14,7 +14,7 @@ public:
 // 	typedef typename Server::gateway_type& gateway_type;
 
 	//! create netdevice
-	explicit netdevice(boost::asio::io_service&);
+	explicit netdevice(boost::asio::io_service&, std::string name);
 	//! just destruction
 	~netdevice() noexcept;
 
