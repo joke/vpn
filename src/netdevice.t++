@@ -20,7 +20,7 @@
 #include <memory>
 
 template <typename Server>
-inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string name) :
+inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string name, boost::asio::ip::address_v6 const& address) :
 	io_(io),
 	strand_(io_),
 	name_(name),
@@ -41,13 +41,11 @@ inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string nam
 	ioctl set(TUNSETIFF, &req);
 	stream_descriptor_.io_control(set);
 	name_ = req.ifr_name;
-// 	needs to be reassigned after this specific ioctl
+// 	needs to be reassigned after this specific ioctl unless async_read_some isn't working
 	stream_descriptor_.release();
 	stream_descriptor_.assign(fd);
 	stream_descriptor_.native_non_blocking(true);
 	
-	std::cerr << "______________IS OPEN : " << stream_descriptor_.is_open() << "_________ fd: " << fd << std::endl;
-
 	// calculate address from fingerprint
 // // 	stringstream add;
 // // 	auto finger(to_hex(gateway_.fingerprint().data(), gateway_.fingerprint().size()));
@@ -63,7 +61,9 @@ inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string nam
 // // 	// route up and go
 // // 	address(boost::asio::ip::address_v6::from_string(add.str()));
 	
-	system(string("ifconfig " + name_ + " up add fc45:7f3:398a:6e1f:8e7::4/8").data());
+	std::stringstream ss;
+	ss << "ifconfig " << name_ << " up add " << address << "/8";
+	system(ss.str().data());
 	
 // 	address(boost::asio::ip::address_v6::from_string("fc44:07f3:398a:6e1F:08e7:7756:ff39:029e"));
 // 	route(boost::asio::ip::address_v6::from_string("fc::"), 64);
@@ -216,8 +216,7 @@ inline void netdevice<Server>::accept() {
 	auto buffer(make_shared<vector<uint8_t>>());
 	buffer->resize(4096);
 	
-	stream_descriptor_.async_read_some(boost::asio::buffer(*buffer, 4096), bind(&netdevice<Server>::read, this, buffer, _1, _2));
-	std::cerr << __FILE__ << " " << __LINE__ << " " << __FUNCTION__ << " :::: size: " << std::endl;
+	stream_descriptor_.async_read_some(boost::asio::buffer(*buffer), bind(&netdevice<Server>::read, this, buffer, _1, _2));
 }
 
 
@@ -232,12 +231,11 @@ inline void netdevice<Server>::read(std::shared_ptr<std::vector<std::uint8_t>> b
 	
 	std::cerr << __FILE__ << " " << __LINE__ << " " << __FUNCTION__ << " buffercapa: " << buffer->capacity() << " buffersize: " << buffer->size() << std::endl;
 
-
-	std::cerr << "______________________________________________ READ NET __________________________________" << error << " :: " << bytes_transferred << std::endl;
-
 	// TODO: check for errors
 	if (error)
 		return;
+	
+	
 
 	std::cerr << "______________________________________________ READ NET 2__________________________________" << error << std::endl;
 	

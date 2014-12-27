@@ -69,6 +69,7 @@ void validate(boost::any& v, std::vector<std::string> const& values, std::shared
 void validate(boost::any& v, std::vector<std::string> const& values, std::shared_ptr<gnutls::credentials>* const e, int const) {
 	using namespace boost;
 	using namespace program_options;
+	using namespace std;
 
 	try {
 		validators::check_first_occurrence(v);
@@ -79,7 +80,7 @@ void validate(boost::any& v, std::vector<std::string> const& values, std::shared
 		gnutls::openpgp::certificate cert(public_key);
 		gnutls::openpgp::privatekey priv(private_key);
 
-		v = any(std::make_shared<gnutls::credentials>(cert, priv));
+		v = any(make_shared<gnutls::credentials>(move(cert), move(priv)));
 	} catch (std::exception const& e) {
 		throw validation_error(validation_error::invalid_option_value);
 	}

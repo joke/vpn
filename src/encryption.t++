@@ -274,13 +274,12 @@ inline credentials::operator gnutls_priority_t() const {
 	return priority_;
 }
 
-inline credentials::credentials() : credentials_(nullptr), dh_params_(nullptr), priority_(nullptr) {
-}
+// inline credentials::credentials() : credentials_(nullptr), dh_params_(nullptr), priority_(nullptr) {
+// }
 
-inline credentials::credentials(openpgp::certificate& c, openpgp::privatekey& p) : credentials_(nullptr), dh_params_(nullptr), priority_(nullptr) {
+inline credentials::credentials(openpgp::certificate&& c, openpgp::privatekey&& p) : certificate_(std::move(c)), privatekey_(std::move(p)), credentials_(nullptr), dh_params_(nullptr), priority_(nullptr) {
 	wrap_error(::gnutls_certificate_allocate_credentials(&credentials_));
-
-	wrap_error(::gnutls_certificate_set_openpgp_key(credentials_, c, p));
+	wrap_error(::gnutls_certificate_set_openpgp_key(credentials_, certificate_, privatekey_));
 
 
 
@@ -323,6 +322,10 @@ inline credentials& credentials::operator=(credentials&& c) {
 
 inline void credentials::verify_function(gnutls_certificate_verify_function f) {
 	::gnutls_certificate_set_verify_function(credentials_, f);
+}
+
+inline std::vector<std::uint8_t> credentials::fingerprint() const {
+	return certificate_.fingerprint();
 }
 
 
@@ -414,7 +417,12 @@ inline certificate::certificate(datum const& d) : certificate_() {
 	wrap_error(::gnutls_openpgp_crt_set_preferred_key_id(certificate_, nullptr));
 }
 
+inline certificate::certificate(certificate&& c) : certificate_(std::move(c)) {
+	c.certificate_ = nullptr;
+}
+
 inline certificate::~certificate() {
+	std::cerr << "_____________________________________________ certificate::~certificate() " << std::endl;
 	if (certificate_)
 		gnutls_openpgp_crt_deinit(certificate_);
 }
@@ -425,11 +433,14 @@ inline certificate::operator gnutls_openpgp_crt_t() const {
 
 inline std::vector<std::uint8_t> certificate::fingerprint() const {
 	using namespace std;
-
-	size_t length(20);
+	
+	size_t length(20); // fingerprints have a maximum length of 16 or 20
 	vector<uint8_t> fp(length);
+	
 	// TODO return value
-	::gnutls_openpgp_crt_get_fingerprint(certificate_, fp.data(), &length);
+	auto x = ::gnutls_openpgp_crt_get_fingerprint(certificate_, fp.data(), &length);
+	
+	std::cerr << "_______________________________________ASDFASFDASDF: " << x << std::endl;
 	fp.resize(length);
 	return fp;
 }
@@ -449,6 +460,10 @@ inline privatekey::privatekey(datum const& d) : privatekey_() {
 	wrap_error(::gnutls_openpgp_privkey_init(&privatekey_));
 	wrap_error(::gnutls_openpgp_privkey_import(privatekey_, d, GNUTLS_OPENPGP_FMT_RAW, nullptr, 0));
 	wrap_error(::gnutls_openpgp_privkey_set_preferred_key_id(privatekey_, nullptr));
+}
+
+inline privatekey::privatekey(privatekey&& p) : privatekey_(std::move(p)) {
+	p.privatekey_ = nullptr;
 }
 
 inline privatekey::~privatekey() {

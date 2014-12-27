@@ -38,6 +38,22 @@ inline std::basic_istream<_CharT, _Traits>& operator<<(std::basic_istream<_CharT
 	return s;
 }
 
+template <typename InputInterator>
+inline boost::asio::ip::address hex_to_address(InputInterator begin, InputInterator end) {
+	std::string str(to_hex(begin, end), false);
+	for (std::size_t idx(4); idx < str.length(); idx += 5)
+		str.insert(idx, ":");
+	str.replace(0, 2, "fc");	
+	
+	return boost::asio::ip::address::from_string(str);
+}
+
+template <typename T>
+inline  boost::asio::ip::address hex_to_address(std::vector<T> const& v) {
+	if (v.size() > 16)
+		return hex_to_address(end(v)-16, end(v));
+	return hex_to_address(begin(v), end(v));
+}
 
 namespace boost {
 namespace serialization {

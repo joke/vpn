@@ -41,7 +41,7 @@ private:
 	static global* global_;
 };
 
-// } // namespace: <>
+class credentials;
 
 namespace openpgp {
 // namespace {
@@ -49,7 +49,6 @@ namespace openpgp {
 class certificate;
 class privatekey;
 
-// } // namespace: <>
 } // namespace: openpgp
 
 // namespace {
@@ -75,29 +74,6 @@ private:
 	explicit datum(datum const&) = delete;
 	datum& operator=(datum const&) = delete;
 	datum& operator=(datum&&) = delete;
-};
-
-class credentials {
-public:
-	explicit credentials();
-	explicit credentials(openpgp::certificate&, openpgp::privatekey&);
-	~credentials();
-	operator gnutls_certificate_credentials_t() const;
-	operator gnutls_priority_t() const;
-	//! set verify function
-	void verify_function(gnutls_certificate_verify_function);
-	//! verify callback function used by gntusl
-	static int verify(gnutls_session_t);
-	credentials& operator=(credentials&&);
-protected:
-	gnutls_certificate_credentials_t credentials_; //!< credentials
-	gnutls_dh_params_t dh_params_; //!< diffie-hellmann parameter
-	gnutls_priority_t priority_; //!< priorities
-
-private:
-	explicit credentials(credentials const&) = delete;
-	explicit credentials(credentials&&) = delete;
-	credentials& operator=(credentials const&) = delete;
 };
 
 class diffie_hellman {
@@ -144,8 +120,6 @@ private:
 	gnutls_session_t session_;
 };
 
-// } // namespace: <>
-
 namespace openpgp {
 // namespace {
 
@@ -153,6 +127,7 @@ namespace openpgp {
 class certificate {
 public:
 	explicit certificate(datum const&);
+	explicit certificate(certificate&&);
 	~certificate();
 	operator gnutls_openpgp_crt_t() const;
 	//! get vector with fingerprint
@@ -168,7 +143,6 @@ protected:
 private:
 	explicit certificate() = delete;
 	explicit certificate(certificate const&) = delete;
-	explicit certificate(certificate&&) = delete;
 	certificate& operator=(certificate const&) = delete;
 	certificate& operator=(certificate&&) = delete;
 };
@@ -177,6 +151,7 @@ private:
 class privatekey {
 public:
 	explicit privatekey(datum const&);
+	explicit privatekey(privatekey&&);
 	~privatekey();
 	operator gnutls_openpgp_privkey_t() const;
 	//! get vector with fingerprint
@@ -190,13 +165,39 @@ protected:
 private:
 	explicit privatekey() = delete;
 	explicit privatekey(privatekey const&) = delete;
-	explicit privatekey(privatekey&&) = delete;
 	privatekey& operator=(privatekey const&) = delete;
 	privatekey& operator=(privatekey&&) = delete;
 };
 
-// } // namespace: <>
 } // namespace: openpgp
+
+class credentials {
+public:
+	explicit credentials(openpgp::certificate&&, openpgp::privatekey&&);
+	~credentials();
+	operator gnutls_certificate_credentials_t() const;
+	operator gnutls_priority_t() const;
+	//! set verify function
+	void verify_function(gnutls_certificate_verify_function);
+	//! verify callback function used by gntusl
+	static int verify(gnutls_session_t);
+	credentials& operator=(credentials&&);
+	std::vector<std::uint8_t> fingerprint() const;
+	
+protected:
+	openpgp::certificate certificate_;
+	openpgp::privatekey privatekey_;
+	gnutls_certificate_credentials_t credentials_; //!< credentials
+	gnutls_dh_params_t dh_params_; //!< diffie-hellmann parameter
+	gnutls_priority_t priority_; //!< priorities
+	
+private:
+	explicit credentials() = delete;
+	explicit credentials(credentials const&) = delete;
+	explicit credentials(credentials&&) = delete;
+	credentials& operator=(credentials const&) = delete;
+};
+
 } // namespace: gnutls
 
 namespace gnupg {
