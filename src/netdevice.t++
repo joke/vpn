@@ -20,7 +20,7 @@
 #include <memory>
 
 template <typename Server>
-inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string name, boost::asio::ip::address_v6 const& address) :
+inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string name, boost::asio::ip::address_v6 const& add) :
 	io_(io),
 	strand_(io_),
 	name_(name),
@@ -46,34 +46,14 @@ inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string nam
 	stream_descriptor_.assign(fd);
 	stream_descriptor_.native_non_blocking(true);
 	
-	// calculate address from fingerprint
-// // 	stringstream add;
-// // 	auto finger(to_hex(gateway_.fingerprint().data(), gateway_.fingerprint().size()));
-// // 	add << "fc" << finger[10] << finger[11] << ":"
-// // 		<< finger[12] << finger[13] << finger[14] << finger[15] << ":"
-// // 		<< finger[16] << finger[17] << finger[18] << finger[19] << ":"
-// // 		<< finger[20] << finger[21] << finger[22] << finger[23] << ":"
-// // 		<< finger[24] << finger[25] << finger[26] << finger[27] << ":"
-// // 		<< finger[28] << finger[29] << finger[30] << finger[31] << ":"
-// // 		<< finger[32] << finger[33] << finger[34] << finger[35] << ":"
-// // 		<< finger[36] << finger[37] << finger[38] << finger[39];
-// //
-// // 	// route up and go
-// // 	address(boost::asio::ip::address_v6::from_string(add.str()));
-	
-	std::stringstream ss;
-	ss << "ifconfig " << name_ << " up add " << address << "/8";
-	system(ss.str().data());
-	
-// 	address(boost::asio::ip::address_v6::from_string("fc44:07f3:398a:6e1F:08e7:7756:ff39:029e"));
-// 	route(boost::asio::ip::address_v6::from_string("fc::"), 64);
-// 	up();
-// 	mtu(1280);
+	address(add);
+	route(boost::asio::ip::address_v6::from_string("fc::"), 64);
+	up();
+	mtu(1280);
 }
 
 template <typename Server>
 inline void netdevice<Server>::startup() {
-	std::cerr << __FILE__ << " " << __LINE__ << " " << __FUNCTION__ << std::endl;
 	accept();
 }
 
