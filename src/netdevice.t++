@@ -12,21 +12,29 @@
 #include <cerrno>
 #include <functional>
 #include <system_error>
-#include <linux/if_tun.h>
-#include <linux/ipv6_route.h>
 #include <iomanip>
 #include <thread>
 #include <utility>
 #include <memory>
+#include <linux/if_tun.h>
+#include <linux/ipv6_route.h>
+#include <linux/icmpv6.h>
+#include <netinet/ip6.h>
+
 
 template <typename Server>
-inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string name, boost::asio::ip::address_v6 const& add) :
+template <typename Callback>
+inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string name, boost::asio::ip::address_v6 const& add, Callback c) :
 	io_(io),
 	strand_(io_),
 	name_(name),
-	stream_descriptor_(io_)
+	stream_descriptor_(io_),
+	icmp_(io_, boost::asio::ip::icmp::v6()),
+	to_gateway_(c)
 {
 	using namespace std;
+	
+	icmp_.native_non_blocking(true);
 
 	// open device
 	auto fd(::open("/dev/net/tun", O_RDWR));
@@ -215,7 +223,8 @@ inline void netdevice<Server>::read(std::shared_ptr<std::vector<std::uint8_t>> b
 	if (error)
 		return;
 	
-	
+	if (!to_gateway_(buffer))
+		unreachable(buffer);
 
 	std::cerr << "______________________________________________ READ NET 2__________________________________" << error << std::endl;
 	
@@ -225,6 +234,30 @@ inline void netdevice<Server>::read(std::shared_ptr<std::vector<std::uint8_t>> b
 	accept();
 
 // 	gateway_.forward(boost::asio::buffer(const_cast<const uint8_t*>(buffer->data()), bytes_transferred));
+}
+
+template <typename Server>
+void netdevice<Server>::unreachable(std::shared_ptr<std::vector<std::uint8_t>> buffer) {
+	using namespace std;
+	using namespace boost::asio::ip;
+	
+	auto icmp(make_shared<icmp6hdr>());
+	icmp->icmp6_type = ICMPV6_DEST_UNREACH;
+	icmp->icmp6_code = ICMPV6_NOROUTE;
+	icmp->icmp6_cksum = 0;
+	
+	auto ipv6(reinterpret_cast<ip6_hdr const*>(buffer->data()));
+	auto src_ptr(reinterpret_cast<uint8_t const*>(&ipv6->ip6_src));
+	array<uint8_t, 16> src_bytes;
+	copy(src_ptr, src_ptr + 16, begin(src_bytes));
+	address_v6 src(src_bytes);
+	
+	array<boost::asio::const_buffer, 2> buffers{
+		boost::asio::buffer(&*icmp, sizeof(icmp6hdr)),
+		boost::asio::buffer(*buffer, 1280-sizeof(icmp6hdr))
+	};
+	
+	icmp_.send_to(buffers, icmp::endpoint(src, 0));
 }
 
 template <typename Server>

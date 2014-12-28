@@ -21,12 +21,12 @@ public:
 	}
 
 protected:
-	boost::asio::io_service& io_;
-	gnutls::credentials const& credentials_;
-
-protected:
 	void connect();
 	void startup() {}
+	
+	boost::asio::io_service& io_;
+	gnutls::credentials const& credentials_;
+	std::map<std::uint64_t, std::function<void(std::shared_ptr<std::vector<std::uint8_t>>)>> forwarders_;
 };
 
 template<typename Protocol, typename... Protocols>
@@ -62,6 +62,15 @@ public:
 		it->unregister([this, it](){ sessions_.erase(it); });
 		it->start();
 	}
+	
+	bool send(std::shared_ptr<std::vector<std::uint8_t>> v) {
+		std::cerr << "___________________________________ gateway::send ___________________________ " << std::endl;
+		auto forwarder(this->forwarders_.find(1));
+		if (forwarder == this->forwarders_.end())
+			return false;
+		forwarder->second(v);
+		return true;
+	}
 
 	using  gateway<Protocols...>::connect;
 
@@ -79,6 +88,10 @@ protected:
 		socket->native_non_blocking(true);
 		auto it = sessions_.emplace(end(sessions_), move(*socket), this->credentials_, true);
 		it->unregister([this, it](){ sessions_.erase(it); });
+		
+		using session_type = class session<Protocol>;
+		
+		this->forwarders_.emplace(1, std::bind(&session_type::forward, &*it, std::placeholders::_1));
 		it->start();
 	}
 
@@ -86,5 +99,7 @@ protected:
 	std::forward_list<typename Protocol::acceptor> acceptors_;
 	std::list<class session<Protocol>> sessions_;
 };
+
+
 
 #endif

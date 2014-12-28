@@ -61,10 +61,8 @@ public:
 
 
 	std::size_t pull(void* buffer, size_t buffer_size) {
-// 		std::cerr << "____________________________________pull()  buffer : " << buffer << " buffer_size: " << buffer_size << std::endl;
 		auto res = socket_.receive(boost::asio::buffer(buffer, buffer_size), receive_in_flags_, receive_out_flags_, ec_);
 		bytes_available_ = false;
-// 		std::cerr << "____________________________________pull()  buffer : " << buffer << " buffer_size: " << buffer_size << " res: " << res << " ec: " << ec_ << std::endl;
 		return res;
 	}
 
@@ -84,6 +82,10 @@ public:
 
 	void unregister(std::function<void()> f) {
 		unregister_ = f;
+	}
+	
+	void forward(std::shared_ptr<std::vector<std::uint8_t>> v) {
+		std::cerr << "___________________________________ SESSION::forward ________________________________________" << std::endl;
 	}
 
 protected:

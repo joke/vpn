@@ -17,7 +17,7 @@ public:
 	server(std::size_t const threads, std::string name, gnutls::credentials const& cre, Gateway_Args&&... gateway_args) :
 		io_(),
 		threads_(),
-		netdevice_(io_, name, hex_to_address(cre.fingerprint()).to_v6()),
+		netdevice_(io_, name, hex_to_address(cre.fingerprint()).to_v6(), std::bind(&server::to_gateway, this, std::placeholders::_1)),
 		gateway_(io_, cre, gateway_args...) {
 			threads_.reserve(threads);
 			netdevice_.startup();
@@ -34,6 +34,14 @@ public:
 			io_.run();
 	}
 
+	bool to_gateway(std::shared_ptr<std::vector<std::uint8_t>> v) {
+		std::cerr << "______________________________________XXXXXXXXXXXXXXXXXXXXXXXXX_________________________" << std::endl;
+		return gateway_.send(v);
+	}
+	
+	void to_netdevice(boost::asio::const_buffers_1 buf) {
+	}
+	
 	template <typename T>
 	void connect(T const& t) {
 		gateway_.connect(t);
