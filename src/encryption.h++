@@ -8,7 +8,7 @@
 #include <boost/system/error_code.hpp>
 #include <vector>
 #include <array>
-
+#include <memory>
 #include <string>
 
 namespace gnutls {
@@ -57,20 +57,20 @@ class privatekey;
 class datum {
 public:
 	explicit datum();
+	datum(datum&&);
 	explicit datum(std::string const& filename);
-	explicit datum(gnutls_datum_t const*);
 	explicit datum(std::size_t);
 	datum(std::vector<std::uint8_t> const&);
 	~datum();
+	operator gnutls_datum_t*();
 	operator gnutls_datum_t const*() const;
-	gnutls_datum_t const& data() const;
+	std::size_t size() const;
+	std::uint8_t const* data() const;
 
 protected:
 	gnutls_datum_t datum_;
-	gnutls_datum_t const* const datum_p_;
 
 private:
-	explicit datum(datum&&) = delete;
 	explicit datum(datum const&) = delete;
 	datum& operator=(datum const&) = delete;
 	datum& operator=(datum&&) = delete;
@@ -78,7 +78,7 @@ private:
 
 class diffie_hellman {
 public:
-	explicit diffie_hellman(diffie_hellman&&);
+	diffie_hellman(diffie_hellman&&);
 	explicit diffie_hellman(std::size_t);
 	~diffie_hellman();
 	diffie_hellman& operator=(diffie_hellman&&);
@@ -110,14 +110,23 @@ private:
 
 class session {
 public:
-	template <typename SessionPtr, typename PushFunc, typename PullFunc, typename PullTimeoutFunc>
-	session(credentials const&, bool server, SessionPtr, PushFunc, PullFunc, PullTimeoutFunc);
+	template <typename PushFunc, typename PullFunc, typename PullTimeoutFunc, typename VerifyFunc>
+	session(credentials const&, bool server, PushFunc, PullFunc, PullTimeoutFunc, VerifyFunc);
 	~session();
 	void error(boost::system::error_code const&);
 	int handshake();
 	int direction();
-private:
+	gnutls_certificate_type_t certificate_type() const;
+	openpgp::certificate key() const;
+	datum subkeyid() const;
+	void send(std::shared_ptr<std::vector<std::uint8_t>> data);
+
+protected:
 	gnutls_session_t session_;
+	std::function<std::ptrdiff_t(void const*, std::size_t)> push_;
+	std::function<std::ptrdiff_t(void*, std::size_t)> pull_;
+	std::function<int(std::size_t)> pull_timeout_;
+	std::function<bool()> verify_;
 };
 
 namespace openpgp {
@@ -127,7 +136,8 @@ namespace openpgp {
 class certificate {
 public:
 	explicit certificate(datum const&);
-	explicit certificate(certificate&&);
+	explicit certificate(gnutls_datum_t const*);
+	certificate(certificate&&);
 	~certificate();
 	operator gnutls_openpgp_crt_t() const;
 	//! get vector with fingerprint
@@ -151,7 +161,7 @@ private:
 class privatekey {
 public:
 	explicit privatekey(datum const&);
-	explicit privatekey(privatekey&&);
+	privatekey(privatekey&&);
 	~privatekey();
 	operator gnutls_openpgp_privkey_t() const;
 	//! get vector with fingerprint
@@ -173,7 +183,7 @@ private:
 
 class credentials {
 public:
-	explicit credentials(openpgp::certificate&&, openpgp::privatekey&&);
+	credentials(openpgp::certificate&&, openpgp::privatekey&&);
 	~credentials();
 	operator gnutls_certificate_credentials_t() const;
 	operator gnutls_priority_t() const;
@@ -183,14 +193,14 @@ public:
 	static int verify(gnutls_session_t);
 	credentials& operator=(credentials&&);
 	std::vector<std::uint8_t> fingerprint() const;
-	
+
 protected:
 	openpgp::certificate certificate_;
 	openpgp::privatekey privatekey_;
 	gnutls_certificate_credentials_t credentials_; //!< credentials
 	gnutls_dh_params_t dh_params_; //!< diffie-hellmann parameter
 	gnutls_priority_t priority_; //!< priorities
-	
+
 private:
 	explicit credentials() = delete;
 	explicit credentials(credentials const&) = delete;
@@ -203,6 +213,8 @@ private:
 namespace gnupg {
 
 std::vector<std::uint8_t> export_key(std::string const& id, bool private_key);
+
+
 
 } // namespace: gnupg
 

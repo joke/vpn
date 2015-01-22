@@ -12,7 +12,6 @@ global* global::global_(new global());
 
 namespace gnupg {
 
-
 std::vector<std::uint8_t> export_key(std::string const& id, bool private_key) {
 	using namespace std;
 	using namespace boost::asio;

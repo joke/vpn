@@ -15,7 +15,14 @@ public:
 	typedef typename socket::message_flags message_flags;
 
 	explicit session(socket&& s, gnutls::credentials const& c, bool server) :
-		gnutls::session(c, server, this, &base_push, &base_pull, &base_pull_timeout),
+	gnutls::session(
+		c,
+		server,
+		std::bind(&session::push, this, std::placeholders::_1, std::placeholders::_2),
+		std::bind(&session::pull, this, std::placeholders::_1, std::placeholders::_2),
+		std::bind(&session::pull_timeout, this, std::placeholders::_1),
+		std::bind(&session::verify, this)
+	),
 		socket_(std::move(s)),
 		strand_(socket_.get_io_service()),
 		operation_((server) ? operation_state::start : operation_state::handshake),
@@ -38,10 +45,7 @@ public:
 
 	void do_handshake(boost::system::error_code const& ec, std::size_t bytes_transferred) {
 		bytes_available_ = true;
-
-// 		std::cerr << "_____________________________________do_handshake() ec: " << ec << " bytes_transferred: " << bytes_transferred << std::endl;
-		auto res = handshake();
-// 		std::cerr << "_____________________________________do_handshake() res: " << res << std::endl;
+		auto res(handshake());
 		if (res == 0)
 			receive(&session::finish);
 		else
@@ -52,12 +56,31 @@ public:
 // 		std::cerr << "_)))))))))))))))))))))))))))) finish ))))))))))))))))))" << std::endl;
 	}
 
-	template <typename Handler>
-	void receive(Handler&& h) {
-// 		std::cerr << "_________________________________receive(): available: " << socket_.available() << std::endl;
-		socket_.async_receive(boost::asio::null_buffers(), receive_in_flags_, receive_out_flags_, std::bind(&session::do_handshake, this, std::placeholders::_1, std::placeholders::_2));
+	void unregister(std::function<void()> f) {
+		unregister_ = f;
 	}
 
+	void prefix(std::function<void(std::uint64_t const)> f) {
+		prefix_ = f;
+	}
+
+	void forward(std::shared_ptr<std::vector<std::uint8_t>> v) {
+		std::cerr << "___________________________________ SESSION::forward ________________________________________" << std::endl;
+		send(v);
+	}
+
+protected:
+	enum class operation_state {
+		start,
+		handshake,
+		transfer
+	};
+
+	template <typename Handler>
+	void receive(Handler&& h) {
+		// 		std::cerr << "_________________________________receive(): available: " << socket_.available() << std::endl;
+		socket_.async_receive(boost::asio::null_buffers(), receive_in_flags_, receive_out_flags_, std::bind(&session::do_handshake, this, std::placeholders::_1, std::placeholders::_2));
+	}
 
 
 	std::size_t pull(void* buffer, size_t buffer_size) {
@@ -71,7 +94,7 @@ public:
 	}
 
 	int pull_timeout(unsigned int timeout) {
-// 		std::cerr << "_________________ pull_timeout: " << timeout << std::endl;
+		// 		std::cerr << "_________________ pull_timeout: " << timeout << std::endl;
 
 		if (bytes_available_)
 			return 1;
@@ -80,42 +103,35 @@ public:
 		return -1;
 	}
 
-	void unregister(std::function<void()> f) {
-		unregister_ = f;
-	}
-	
-	void forward(std::shared_ptr<std::vector<std::uint8_t>> v) {
-		std::cerr << "___________________________________ SESSION::forward ________________________________________" << std::endl;
-	}
+	int verify() {
+		std::cerr << "______________________________________________ SESSION::verify ________________________________________" << std::endl;
 
-protected:
-	static ssize_t base_push(void* s, void const* buffer, size_t buffer_size) {
-		return static_cast<session*>(s)->push(buffer, buffer_size);
+		if (certificate_type() != GNUTLS_CRT_OPENPGP)
+			return false;
+
+		auto k = key();
+		auto x = k.fingerprint();
+		std::cerr << "______________________________________________ SESSION::verify size: " << x.size() << std::endl;
+		std::cerr << to_hex(x.data(), x.data()+x.size()) << std::endl;
+
+		x.data()[x.size()-16] = 0xfc;
+		auto y = *reinterpret_cast<std::uint64_t*>(x.data()+x.size()-16);
+		// 		auto z = __builtin_bswap64(*y);
+
+		prefix_(y);
+
+		return true;
 	}
-
-	static ssize_t base_pull(void* s, void* buffer, size_t buffer_size) {
-		return static_cast<session*>(s)->pull(buffer, buffer_size);
-	}
-
-	static int base_pull_timeout(void* s, unsigned int timeout) {
-		return static_cast<session*>(s)->pull_timeout(timeout);
-	}
-
-	enum class operation_state {
-		start,
-		handshake,
-		transfer
-	};
-
 
 private:
 	socket socket_;
 	boost::asio::strand strand_;
 	operation_state operation_;
 	bool server_;
-	
+
 
 	std::function<void()> unregister_;
+	std::function<void(std::uint64_t const)> prefix_;
 	boost::system::error_code ec_;
 
 	message_flags receive_out_flags_;

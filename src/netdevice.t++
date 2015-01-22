@@ -33,7 +33,7 @@ inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string nam
 	to_gateway_(c)
 {
 	using namespace std;
-	
+
 	icmp_.native_non_blocking(true);
 
 	// open device
@@ -53,7 +53,7 @@ inline netdevice<Server>::netdevice(boost::asio::io_service& io, std::string nam
 	stream_descriptor_.release();
 	stream_descriptor_.assign(fd);
 	stream_descriptor_.native_non_blocking(true);
-	
+
 	address(add);
 	route(boost::asio::ip::address_v6::from_string("fc::"), 64);
 	up();
@@ -201,9 +201,7 @@ inline void netdevice<Server>::accept() {
 	using namespace std;
 	using namespace placeholders;
 
-	auto buffer(make_shared<vector<uint8_t>>());
-	buffer->resize(4096);
-	
+	auto buffer(make_shared<vector<uint8_t>>(4096));
 	stream_descriptor_.async_read_some(boost::asio::buffer(*buffer), bind(&netdevice<Server>::read, this, buffer, _1, _2));
 }
 
@@ -216,18 +214,21 @@ inline void netdevice<Server>::send(boost::asio::const_buffers_1 b) {
 template <typename Server>
 inline void netdevice<Server>::read(std::shared_ptr<std::vector<std::uint8_t>> buffer, boost::system::error_code const& error, std::size_t bytes_transferred) {
 	using namespace std;
-	
-	std::cerr << __FILE__ << " " << __LINE__ << " " << __FUNCTION__ << " buffercapa: " << buffer->capacity() << " buffersize: " << buffer->size() << std::endl;
 
 	// TODO: check for errors
 	if (error)
 		return;
-	
-	if (!to_gateway_(buffer))
+
+	buffer->resize(bytes_transferred);
+
+	auto ipv6(reinterpret_cast<ip6_hdr const&>(*buffer->data()));
+	auto destination(reinterpret_cast<std::uint64_t const&>(ipv6.ip6_dst));
+
+	if (!to_gateway_(destination, buffer))
 		unreachable(buffer);
 
 	std::cerr << "______________________________________________ READ NET 2__________________________________" << error << std::endl;
-	
+
 // 	if (bytes_transferred == 0)
 // 		return;
 
@@ -240,23 +241,23 @@ template <typename Server>
 void netdevice<Server>::unreachable(std::shared_ptr<std::vector<std::uint8_t>> buffer) {
 	using namespace std;
 	using namespace boost::asio::ip;
-	
+
 	auto icmp(make_shared<icmp6hdr>());
 	icmp->icmp6_type = ICMPV6_DEST_UNREACH;
 	icmp->icmp6_code = ICMPV6_NOROUTE;
 	icmp->icmp6_cksum = 0;
-	
+
 	auto ipv6(reinterpret_cast<ip6_hdr const*>(buffer->data()));
 	auto src_ptr(reinterpret_cast<uint8_t const*>(&ipv6->ip6_src));
 	array<uint8_t, 16> src_bytes;
 	copy(src_ptr, src_ptr + 16, begin(src_bytes));
 	address_v6 src(src_bytes);
-	
+
 	array<boost::asio::const_buffer, 2> buffers{
 		boost::asio::buffer(&*icmp, sizeof(icmp6hdr)),
 		boost::asio::buffer(*buffer, 1280-sizeof(icmp6hdr))
 	};
-	
+
 	icmp_.send_to(buffers, icmp::endpoint(src, 0));
 }
 

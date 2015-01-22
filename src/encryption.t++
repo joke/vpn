@@ -193,8 +193,8 @@ inline global::global() {
 // 	wrap_error(::gnutls_global_init());
 
 	gnutls_global_set_log_level(99);
-	gnutls_global_set_log_function([](int level, const char* m) {
-		std::cerr << "[gnutls|" << level << "]" << m << std::flush;
+	gnutls_global_set_log_function([](auto level, auto message) {
+		std::cerr << "[gnutls|" << level << "]" << message << std::flush;
 	});
 
 //	if (!::gpgme_check_version("1.2.0"))
@@ -221,41 +221,51 @@ inline global::~global() {
 namespace gnutls {
 // namespace {
 
-inline datum::datum() : datum_(), datum_p_(nullptr) {
+inline datum::datum() : datum_() {
 }
 
-inline datum::datum(std::string const& filename) : datum_(), datum_p_(nullptr) {
+inline datum::datum(datum&& d) : datum_({}) {
+	datum_.data = d.datum_.data;
+	datum_.size = d.datum_.size;
+	d.datum_.data = nullptr;
+	d.datum_.size = 0;
+}
+
+inline datum::datum(std::string const& filename) : datum_() {
 	wrap_error(::gnutls_load_file(filename.data(), &datum_));
 }
 
-inline datum::datum(std::vector<std::uint8_t> const& v) : datum_(), datum_p_(nullptr) {
+inline datum::datum(std::vector<std::uint8_t> const& v) : datum_() {
 	datum_.data = reinterpret_cast<unsigned char*>(const_cast<std::uint8_t*>(v.data()));
 	datum_.size = v.size();
 }
 
-inline datum::datum(gnutls_datum_t const* d) : datum_(), datum_p_(d) {
-}
-
-inline datum::datum(std::size_t s) : datum_(), datum_p_(nullptr) {
+inline datum::datum(std::size_t s) : datum_() {
 	datum_.size = s;
 	datum_.data = static_cast<unsigned char*>(::gnutls_malloc(s));
 }
 
 inline datum::~datum() {
-	// 	if (datum_.data)
-	// 		::gnutls_free(static_cast<void*>(datum_.data));
+	// FIXME:
+// 	if (datum_.data)
+// 		::gnutls_free(datum_.data);
 }
 
 inline datum::operator gnutls_datum_t const*() const {
-	if (datum_p_)
-		return datum_p_;
 	return &datum_;
 }
 
-inline gnutls_datum_t const& datum::data() const {
-	return datum_;
+inline datum::operator gnutls_datum_t*() {
+	return &datum_;
 }
 
+inline std::size_t datum::size() const {
+	return datum_.size;
+}
+
+inline std::uint8_t const* datum::data() const {
+	return datum_.data;
+}
 
 inline credentials::~credentials() {
 	if (credentials_)
@@ -273,9 +283,6 @@ inline credentials::operator gnutls_certificate_credentials_t() const {
 inline credentials::operator gnutls_priority_t() const {
 	return priority_;
 }
-
-// inline credentials::credentials() : credentials_(nullptr), dh_params_(nullptr), priority_(nullptr) {
-// }
 
 inline credentials::credentials(openpgp::certificate&& c, openpgp::privatekey&& p) : certificate_(std::move(c)), privatekey_(std::move(p)), credentials_(nullptr), dh_params_(nullptr), priority_(nullptr) {
 	wrap_error(::gnutls_certificate_allocate_credentials(&credentials_));
@@ -359,33 +366,41 @@ inline diffie_hellman::operator gnutls_dh_params_t() const {
 	return diffie_hellman_;
 }
 
-template <typename SessionPtr, typename PushFunc, typename PullFunc, typename PullTimeoutFunc>
-inline session::session(credentials const& c, bool server, SessionPtr s, PushFunc push, PullFunc pull, PullTimeoutFunc pull_timeout) {
+template <typename PushFunc, typename PullFunc, typename PullTimeoutFunc, typename VerifyFunc>
+inline session::session(credentials const& c, bool server, PushFunc push, PullFunc pull, PullTimeoutFunc pull_timeout, VerifyFunc verify) {
 	wrap_error(::gnutls_init(&session_, ((server) ? GNUTLS_SERVER : GNUTLS_CLIENT) | GNUTLS_DATAGRAM | GNUTLS_NONBLOCK));
 	wrap_error(::gnutls_credentials_set(session_, GNUTLS_CRD_CERTIFICATE, gnutls_certificate_credentials_t(c)));
 
-
-	gnutls_certificate_set_verify_function(gnutls_certificate_credentials_t(c), [](gnutls_session_t) -> int {
-		std::cerr << "_________________________________ VERIFY _________________________________" << std::endl;
-		return 0;
-	});
 	::gnutls_certificate_set_dh_params(gnutls_certificate_credentials_t(c), *cfg::configuration["dh"].as<std::shared_ptr<gnutls::diffie_hellman>>());
-
-
 
 	wrap_error(::gnutls_priority_set(session_, *cfg::configuration["priorities"].as<std::shared_ptr<gnutls::priorities>>()));
 
 	::gnutls_certificate_server_set_request(session_, GNUTLS_CERT_REQUIRE);
 	::gnutls_openpgp_send_cert(session_, GNUTLS_OPENPGP_CERT);
 // 	wrap_error(::gnutls_heartbeat_enable(session_, GNUTLS_HB_PEER_ALLOWED_TO_SEND));
-	::gnutls_session_set_ptr(session_, s);
-	::gnutls_transport_set_ptr(session_, s);
 
-	::gnutls_transport_set_pull_function(session_, pull);
-	::gnutls_transport_set_push_function(session_, push);
-	::gnutls_transport_set_pull_timeout_function(session_, pull_timeout);
 	::gnutls_handshake_set_timeout(session_, 59000);
 	::gnutls_dtls_set_timeouts(session_, 60000, 66000);
+
+	pull_ = pull;
+	push_ = push;
+	pull_timeout_ = pull_timeout;
+	verify_ = verify;
+
+	::gnutls_session_set_ptr(session_, this);
+	::gnutls_transport_set_ptr(session_, this);
+	::gnutls_transport_set_pull_function(session_, [](auto ptr, auto buffer, auto size) {
+		return static_cast<session*>(ptr)->pull_(buffer, size);
+	});
+	::gnutls_transport_set_push_function(session_, [](auto ptr, auto buffer, auto size) {
+		return static_cast<session*>(ptr)->push_(buffer, size);
+	});
+	::gnutls_transport_set_pull_timeout_function(session_, [](auto ptr, auto timeout) {
+		return static_cast<session*>(ptr)->pull_timeout_(timeout);
+	});
+	::gnutls_certificate_set_verify_function(c, [](auto ptr) {
+		return static_cast<session*>(::gnutls_session_get_ptr(ptr))->verify_() ? 0 : 1;
+	});
 }
 
 inline session::~session() {
@@ -404,6 +419,25 @@ inline int session::direction() {
 	return ::gnutls_record_get_direction(session_);
 }
 
+inline gnutls_certificate_type_t session::certificate_type() const {
+	return ::gnutls_certificate_type_get(session_);
+}
+
+inline openpgp::certificate session::key() const {
+	return openpgp::certificate(::gnutls_certificate_get_peers(session_, nullptr));
+}
+
+inline datum session::subkeyid() const {
+	datum d;
+	wrap_error(::gnutls_certificate_get_peers_subkey_id(session_, d));
+	return std::move(d);
+}
+
+inline void session::send(std::shared_ptr<std::vector<std::uint8_t>> data) {
+	auto x = ::gnutls_record_send(session_, data->data(), data->size());
+
+	std::cerr << "_________________SESSION::SEND :: size: " << data->size() << " :: res: " << x << std::endl;
+}
 
 // } // namespace: <>
 
@@ -415,6 +449,11 @@ inline certificate::certificate(datum const& d) : certificate_() {
 	wrap_error(::gnutls_openpgp_crt_import(certificate_, d, GNUTLS_OPENPGP_FMT_RAW));
 	// TODO fix subkey handling
 	wrap_error(::gnutls_openpgp_crt_set_preferred_key_id(certificate_, nullptr));
+}
+
+inline certificate::certificate(gnutls_datum_t const* const d) : certificate_() {
+	wrap_error(::gnutls_openpgp_crt_init(&certificate_));
+	wrap_error(::gnutls_openpgp_crt_import(certificate_, d, GNUTLS_OPENPGP_FMT_RAW));
 }
 
 inline certificate::certificate(certificate&& c) : certificate_(std::move(c)) {
@@ -433,13 +472,13 @@ inline certificate::operator gnutls_openpgp_crt_t() const {
 
 inline std::vector<std::uint8_t> certificate::fingerprint() const {
 	using namespace std;
-	
+
 	size_t length(20); // fingerprints have a maximum length of 16 or 20
 	vector<uint8_t> fp(length);
-	
+
 	// TODO return value
 	auto x = ::gnutls_openpgp_crt_get_fingerprint(certificate_, fp.data(), &length);
-	
+
 	std::cerr << "_______________________________________ASDFASFDASDF: " << x << std::endl;
 	fp.resize(length);
 	return fp;

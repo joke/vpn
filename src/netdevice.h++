@@ -54,7 +54,7 @@ protected:
 	std::string name_; //!< string holding device name
 	boost::asio::posix::stream_descriptor stream_descriptor_; //!< stream descriptor of tuntap
 	boost::asio::ip::icmp::socket icmp_;
-	std::function<bool(std::shared_ptr<std::vector<std::uint8_t>>)> to_gateway_;
+	std::function<bool(std::uint64_t const, std::shared_ptr<std::vector<std::uint8_t>> const)> to_gateway_;
 
 	//
 	class ioctl {

@@ -23,7 +23,7 @@ public:
 protected:
 	void connect();
 	void startup() {}
-	
+
 	boost::asio::io_service& io_;
 	gnutls::credentials const& credentials_;
 	std::map<std::uint64_t, std::function<void(std::shared_ptr<std::vector<std::uint8_t>>)>> forwarders_;
@@ -60,15 +60,33 @@ public:
 
 		auto it = sessions_.emplace(end(sessions_), std::move(socket), this->credentials_, false);
 		it->unregister([this, it](){ sessions_.erase(it); });
+		it->prefix([this, it](auto prefix) {
+			using session_type = class session<Protocol>;
+
+			std::cerr << "___________________________________ gateway::SETTING PREFIX ___________________________: " << prefix << std::endl;
+
+
+			this->forwarders_.emplace(prefix, std::bind(&session_type::forward, std::ref(*it), std::placeholders::_1));
+		});
 		it->start();
 	}
-	
-	bool send(std::shared_ptr<std::vector<std::uint8_t>> v) {
-		std::cerr << "___________________________________ gateway::send ___________________________ " << std::endl;
-		auto forwarder(this->forwarders_.find(1));
-		if (forwarder == this->forwarders_.end())
+
+	bool send(std::uint64_t const prefix, std::shared_ptr<std::vector<std::uint8_t>> const data) {
+		std::cerr << "___________________________________ gateway::send ___________________________ size: " << this->forwarders_.size() << std::endl;
+		std::cerr << "___________________________________ gateway::send ___________________________ prefix: " << prefix << std::endl;
+
+
+		for (auto x : this->forwarders_) {
+			std::cerr << "_________________SSSSSSSSSSSSSSSSSSSSS: " << x.first << std::endl;
+		}
+
+		auto forwarder(this->forwarders_.find(prefix));
+		if (forwarder == this->forwarders_.end()) {
+			std::cerr << "_________________ NO FORWARDING: " << std::endl;
 			return false;
-		forwarder->second(v);
+		}
+		std::cerr << "_________________FORWARDING: " << std::endl;
+		forwarder->second(data);
 		return true;
 	}
 
@@ -77,7 +95,8 @@ public:
 protected:
 	void session(typename Protocol::acceptor& acceptor,std::shared_ptr<typename Protocol::socket> socket, boost::system::error_code const& error) {
 		using namespace std;
-		
+		using session_type = class session<Protocol>;
+
 		std::cerr << "______________________________ QUEUE size: " << sessions_.size() << std::endl;
 
 		{
@@ -86,12 +105,17 @@ protected:
 		}
 
 		socket->native_non_blocking(true);
-		auto it = sessions_.emplace(end(sessions_), move(*socket), this->credentials_, true);
-		it->unregister([this, it](){ sessions_.erase(it); });
-		
-		using session_type = class session<Protocol>;
-		
-		this->forwarders_.emplace(1, std::bind(&session_type::forward, &*it, std::placeholders::_1));
+
+		auto it(sessions_.emplace(end(sessions_), move(*socket), this->credentials_, true));
+		it->unregister([this, it]() {
+			sessions_.erase(it);
+		});
+		it->prefix([this, it](auto prefix) {
+			std::cerr << "___________________________________ gateway::SETTING PREFIX ___________________________: " << prefix << std::endl;
+
+			this->forwarders_.emplace(prefix, std::bind(&session_type::forward, std::ref(*it), std::placeholders::_1));
+		});
+
 		it->start();
 	}
 
