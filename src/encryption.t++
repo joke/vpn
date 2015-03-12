@@ -7,6 +7,9 @@
 #include "convert.h++"
 #include "program_options.h++"
 
+// #include <boost/log/trivial.hpp>
+// #include <boost/log/core.hpp>
+
 namespace gnutls {
 // namespace {
 
@@ -186,6 +189,12 @@ inline std::error_category const& gnutls_category() noexcept {
 	return error_category::instance();
 }
 
+template <typename T1, typename T2>
+inline void log(T1 level, T2 message) {
+// 	BOOST_LOG_TRIVIAL(trace) << "[gnutls|" << level << "]" << message;
+	std::cerr << "[GNUTLS|" << level << "]" << message << std::flush;
+}
+
 inline global::global() {
 	// check correct linkage
 	if (!::gnutls_check_version("3.3.10"))
@@ -193,9 +202,7 @@ inline global::global() {
 // 	wrap_error(::gnutls_global_init());
 
 	gnutls_global_set_log_level(99);
-	gnutls_global_set_log_function([](auto level, auto message) {
-		std::cerr << "[gnutls|" << level << "]" << message << std::flush;
-	});
+	gnutls_global_set_log_function(&log);
 
 //	if (!::gpgme_check_version("1.2.0"))
 //		throw std::runtime_error("wrong gpgme version");
@@ -437,6 +444,13 @@ inline void session::send(std::shared_ptr<std::vector<std::uint8_t>> data) {
 	auto x = ::gnutls_record_send(session_, data->data(), data->size());
 
 	std::cerr << "_________________SESSION::SEND :: size: " << data->size() << " :: res: " << x << std::endl;
+}
+
+inline std::shared_ptr<std::vector<std::uint8_t>> session::receive() {
+	auto buffer(std::make_shared<std::vector<std::uint8_t>>(4096));
+	auto size(::gnutls_record_recv(session_, buffer->data(), 4096));
+	buffer->resize(size);
+	return buffer;
 }
 
 // } // namespace: <>

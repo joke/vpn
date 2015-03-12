@@ -29,10 +29,10 @@ std::vector<std::uint8_t> export_key(std::string const& id, bool private_key) {
 	vector<uint8_t> buffer(102400);
 	size_t const bytes_read = read(sd, boost::asio::buffer(buffer), ec);
 	if (ec)
-		; // TODO ec always bad??
-		else
-			;
-		buffer.resize(bytes_read);
+	; // TODO ec always bad??
+	else
+		;
+	buffer.resize(bytes_read);
 	::pclose(pipe);
 
 	return buffer;

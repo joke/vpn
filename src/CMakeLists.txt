@@ -26,7 +26,7 @@ target_link_libraries(vpn ${GnuTLS_LIBRARIES} ${Boost_LIBRARIES} ${GPGME_LIBRARI
 add_executable(experimental test.c++)
 target_link_libraries(experimental ${GnuTLS_LIBRARIES} ${Boost_LIBRARIES} ${GPGME_LIBRARIES} ${IDN2_LIBRARIES})
 
-install(TARGETS vpn DESTINATION "${CMAKE_INSTALL_PREFIX}/sbin")
+install(TARGETS vpn DESTINATION "sbin")
 
 if(USE_INTERNAL_BOOST)
 	add_dependencies(vpn libboost)

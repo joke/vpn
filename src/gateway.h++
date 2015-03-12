@@ -17,7 +17,7 @@ class gateway;
 template<>
 class gateway<> {
 public:
-	explicit gateway(boost::asio::io_service& io, gnutls::credentials const& c) : io_(io), credentials_(c) {
+	explicit gateway(boost::asio::io_service& io, gnutls::credentials const& c, std::function<void(std::shared_ptr<std::vector<std::uint8_t>> const)> g) : io_(io), credentials_(c), gateway_(g) {
 	}
 
 protected:
@@ -26,14 +26,15 @@ protected:
 
 	boost::asio::io_service& io_;
 	gnutls::credentials const& credentials_;
+	std::function<void(std::shared_ptr<std::vector<std::uint8_t>> const)> gateway_;
 	std::map<std::uint64_t, std::function<void(std::shared_ptr<std::vector<std::uint8_t>>)>> forwarders_;
 };
 
 template<typename Protocol, typename... Protocols>
 class gateway<Protocol, Protocols...> : public gateway<Protocols...> {
 public:
-	explicit gateway(boost::asio::io_service& io, gnutls::credentials const& c, std::vector<typename Protocol::endpoint> const& e, std::vector<typename Protocols::endpoint> const&... args) :
-	gateway<Protocols...>(io, c, args...) {
+	explicit gateway(boost::asio::io_service& io, gnutls::credentials const& c, std::function<void(std::shared_ptr<std::vector<std::uint8_t>> const)> g, std::vector<typename Protocol::endpoint> const& e, std::vector<typename Protocols::endpoint> const&... args) :
+	gateway<Protocols...>(io, c, g, args...) {
 		std::for_each(begin(e), end(e), [&](auto const& e) {
 			acceptors_.emplace_front(io, e);
 			auto& acceptor(acceptors_.front());
@@ -60,6 +61,11 @@ public:
 
 		auto it = sessions_.emplace(end(sessions_), std::move(socket), this->credentials_, false);
 		it->unregister([this, it](){ sessions_.erase(it); });
+
+		std::cerr << "___________________________________ gateway::SETTING PREFIX 1 ___________________________: " << std::endl;
+		it->gateway(this->gateway_);
+		std::cerr << "___________________________________ gateway::SETTING PREFIX 2 ___________________________: " << std::endl;
+
 		it->prefix([this, it](auto prefix) {
 			using session_type = class session<Protocol>;
 
@@ -110,6 +116,7 @@ protected:
 		it->unregister([this, it]() {
 			sessions_.erase(it);
 		});
+		it->gateway(this->gateway_);
 		it->prefix([this, it](auto prefix) {
 			std::cerr << "___________________________________ gateway::SETTING PREFIX ___________________________: " << prefix << std::endl;
 

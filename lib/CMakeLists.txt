@@ -1,4 +1,4 @@
-set(BOOST_COMPONENTS program_options signals thread serialization system regex)
+set(BOOST_COMPONENTS program_options signals thread serialization system regex log)
 set(Boost_USE_MULTITHREADED ON)
 
 set_property(DIRECTORY . PROPERTY EP_PREFIX .)

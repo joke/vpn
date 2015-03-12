@@ -1,6 +1,8 @@
 #ifndef encryption_h
 #define encryption_h
 
+
+
 #include <gnutls/gnutls.h>
 #include <gnutls/dtls.h>
 #include <gnutls/openpgp.h>
@@ -120,6 +122,7 @@ public:
 	openpgp::certificate key() const;
 	datum subkeyid() const;
 	void send(std::shared_ptr<std::vector<std::uint8_t>> data);
+	std::shared_ptr<std::vector<std::uint8_t>> receive();
 
 protected:
 	gnutls_session_t session_;

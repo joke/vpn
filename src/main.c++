@@ -1,5 +1,9 @@
 #define BOOST_BIND_NO_PLACEHOLDERS
 #include <functional>
+#include <boost/log/trivial.hpp>
+#include <boost/log/core.hpp>
+#include <boost/log/attributes.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
 
 namespace boost {
 	// include std::placeholders (c++11) in boost namespace
@@ -18,6 +22,9 @@ int main(int const argc, char const* const* const argv) {
 	using namespace boost::asio::ip;
 	using namespace std;
 	using namespace cfg;
+
+	boost::log::add_common_attributes();
+	boost::log::core::get()->add_global_attribute("Scope", boost::log::attributes::named_scope());
 
 	parse_command_line(argc, argv);
 

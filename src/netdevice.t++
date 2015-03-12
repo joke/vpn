@@ -207,8 +207,9 @@ inline void netdevice<Server>::accept() {
 
 
 template <typename Server>
-inline void netdevice<Server>::send(boost::asio::const_buffers_1 b) {
-	boost::asio::write(stream_descriptor_, b);
+inline void netdevice<Server>::send(std::shared_ptr<std::vector<std::uint8_t>> const data) {
+	BOOST_LOG_TRIVIAL(trace) << "send to Netdevice: " << data->size();
+	boost::asio::write(stream_descriptor_, boost::asio::buffer(*data));
 }
 
 template <typename Server>

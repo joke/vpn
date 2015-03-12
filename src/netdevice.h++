@@ -25,7 +25,7 @@ public:
 	//! check if the device is up
 	bool is_up() const;
 	//! send data to device
-	void send(boost::asio::const_buffers_1);
+	void send(std::shared_ptr<std::vector<std::uint8_t>> const);
 	//! get name of device
 	std::string const& name() noexcept;
 

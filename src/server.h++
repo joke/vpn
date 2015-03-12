@@ -18,7 +18,7 @@ public:
 		io_(),
 		threads_(),
 		netdevice_(io_, name, hex_to_address(cre.fingerprint()).to_v6(), std::bind(&server::to_gateway, this, std::placeholders::_1, std::placeholders::_2)),
-		gateway_(io_, cre, gateway_args...) {
+		gateway_(io_, cre, std::bind(&server::to_netdevice, this, std::placeholders::_1), gateway_args...) {
 			threads_.reserve(threads);
 			netdevice_.startup();
 			gateway_.startup();
@@ -38,7 +38,8 @@ public:
 		return gateway_.send(prefix, data);
 	}
 
-	void to_netdevice(boost::asio::const_buffers_1 buf) {
+	void to_netdevice(std::shared_ptr<std::vector<std::uint8_t>> const data) {
+		return netdevice_.send(data);
 	}
 
 	template <typename T>

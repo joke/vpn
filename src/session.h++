@@ -40,32 +40,65 @@ public:
 	}
 
 	void start() {
+		BOOST_LOG_TRIVIAL(trace) << "start()";
+
 		do_handshake(boost::system::error_code(EAGAIN, boost::system::system_category()), -1);
 	}
 
 	void do_handshake(boost::system::error_code const& ec, std::size_t bytes_transferred) {
+		BOOST_LOG_TRIVIAL(trace) << "do_handshake()";
+
 		bytes_available_ = true;
 		auto res(handshake());
-		if (res == 0)
+		if (res == 0) {
+			BOOST_LOG_TRIVIAL(trace) << "handshake finished";
 			receive(&session::finish);
-		else
+		}
+		else {
+			BOOST_LOG_TRIVIAL(trace) << "next handshake: " << res;
 			receive(&session::do_handshake);
+		}
 	}
 
 	void finish(boost::system::error_code const& ec, std::size_t bytes_transferred) {
-// 		std::cerr << "_)))))))))))))))))))))))))))) finish ))))))))))))))))))" << std::endl;
+		BOOST_LOG_TRIVIAL(trace) << "finish()";
+		bytes_available_ = true;
+
+		auto buffer(gnutls::session::receive());
+		BOOST_LOG_TRIVIAL(trace) << "receive buffer size: " << buffer->size();
+
+		// send data to netdevice here
+		if (!gateway_)
+			BOOST_LOG_TRIVIAL(trace) << "no forwarding function set!!!!!!!!!!!";
+		gateway_(buffer);
+		BOOST_LOG_TRIVIAL(trace) << "gateway_(buffer);";
+
+
+		receive(&session::finish);
+	}
+
+	void gateway(std::function<void(std::shared_ptr<std::vector<std::uint8_t>> const)> g) {
+		BOOST_LOG_TRIVIAL(trace) << "set forwarding function!!!!!!!!!!!";
+
+		gateway_ = g;
 	}
 
 	void unregister(std::function<void()> f) {
+		BOOST_LOG_TRIVIAL(trace) << "unregister()";
+
 		unregister_ = f;
 	}
 
 	void prefix(std::function<void(std::uint64_t const)> f) {
+		BOOST_LOG_TRIVIAL(trace) << "prefix()";
+
 		prefix_ = f;
 	}
 
 	void forward(std::shared_ptr<std::vector<std::uint8_t>> v) {
-		std::cerr << "___________________________________ SESSION::forward ________________________________________" << std::endl;
+		BOOST_LOG_TRIVIAL(trace) << "forward()";
+
+		BOOST_LOG_TRIVIAL(trace) << "SESSION::FORWARD";
 		send(v);
 	}
 
@@ -78,22 +111,30 @@ protected:
 
 	template <typename Handler>
 	void receive(Handler&& h) {
+		BOOST_LOG_TRIVIAL(trace) << "session::receive()";
+
+
+
 		// 		std::cerr << "_________________________________receive(): available: " << socket_.available() << std::endl;
-		socket_.async_receive(boost::asio::null_buffers(), receive_in_flags_, receive_out_flags_, std::bind(&session::do_handshake, this, std::placeholders::_1, std::placeholders::_2));
+		socket_.async_receive(boost::asio::null_buffers(), receive_in_flags_, receive_out_flags_, std::bind(h, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
 
 	std::size_t pull(void* buffer, size_t buffer_size) {
+		BOOST_LOG_TRIVIAL(trace) << "pull()";
+
 		auto res = socket_.receive(boost::asio::buffer(buffer, buffer_size), receive_in_flags_, receive_out_flags_, ec_);
 		bytes_available_ = false;
 		return res;
 	}
 
 	std::size_t push(void const* buffer, size_t buffer_size) {
+		BOOST_LOG_TRIVIAL(trace) << "push()";
 		return socket_.send(boost::asio::buffer(buffer, buffer_size), send_flags_);
 	}
 
 	int pull_timeout(unsigned int timeout) {
+		BOOST_LOG_TRIVIAL(trace) << "pull_timeout()";
 		// 		std::cerr << "_________________ pull_timeout: " << timeout << std::endl;
 
 		if (bytes_available_)
@@ -104,7 +145,7 @@ protected:
 	}
 
 	int verify() {
-		std::cerr << "______________________________________________ SESSION::verify ________________________________________" << std::endl;
+		BOOST_LOG_TRIVIAL(trace) << "verify()";
 
 		if (certificate_type() != GNUTLS_CRT_OPENPGP)
 			return false;
@@ -132,6 +173,7 @@ private:
 
 	std::function<void()> unregister_;
 	std::function<void(std::uint64_t const)> prefix_;
+	std::function<void(std::shared_ptr<std::vector<std::uint8_t>> const)> gateway_;
 	boost::system::error_code ec_;
 
 	message_flags receive_out_flags_;
