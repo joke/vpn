@@ -8,7 +8,7 @@ option(USE_INTERNAL_BOOST "Use internal boost librabry" no)
 set(USE_INTERNAL_BOOST ${USE_INTERNAL_BOOST} PARENT_SCOPE)
 if(NOT USE_INTERNAL_BOOST)
 	include(FindBoost)
-	find_package(Boost 1.57.0 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
+	find_package(Boost 1.58.0 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 	set(Boost_INCLUDE_DIRS ${Boost_INCLUDE_DIRS} PARENT_SCOPE)
 	set(Boost_LIBRARIES ${Boost_LIBRARIES} PARENT_SCOPE)
 else()
@@ -22,7 +22,7 @@ else()
 	set(BOOST_INCLUDED_VERSION TRUE PARENT_SCOPE)
 	include(ExternalProject)
 	ExternalProject_Add(libboost
-		URL http://sourceforge.net/projects/boost/files/boost/1.57.0/boost_1_57_0.tar.bz2/download
+		URL http://sourceforge.net/projects/boost/files/boost/1.58.0/boost_1_58_0.tar.bz2/download
 		URL_HASH SHA512=61881440fd89644c43c6e3bc6292e9fed75a6d3a76f98654b189d0ed4e1087d77b585884e882270c08bf9f7132b173bfc1fde05848e06aa78ba7f1008d10714d
 		CONFIGURE_COMMAND <SOURCE_DIR>/bootstrap.sh --with-icu --prefix=<INSTALL_DIR> --with-libraries=${BOOST_COMPONENTS_LIST}
 		BUILD_COMMAND <SOURCE_DIR>/b2 -a --build-dir=<BINARY_DIR> variant=release link=static threading=multi ${BOOST_DEBUG_FLAGS} stage
@@ -47,7 +47,7 @@ if(NOT USE_INTERNAL_GNUTLS)
 	set(GNUTLS_DEFINITIONS ${GNUTLS_DEFINITIONS} PARENT_SCOPE)
 else()
 	ExternalProject_Add(libgmp
-		URL http://gmplib.org/download/gmp/gmp-5.1.3.tar.bz2
+		URL https://gmplib.org/download/gmp/gmp-5.1.3.tar.bz2
 		URL_HASH SHA512=f42ce1fa02962d25f94e21c79837f0eac1f8fc8d5c7804b7413926be8739ae0e8da33c63b5cebad17b3b6caae495ace0ef2e54dd2f194a0870e85c48172382dc
 		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --enable-shared=no CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} "CFLAGS=-O3 -g0" "CXXFLAGS=-O3 -g0"
 	)
